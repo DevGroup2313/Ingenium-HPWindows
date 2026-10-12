@@ -1,0 +1,55 @@
+INGENIUM
+Copyright (c) 2026 Yannie D. Forest. All rights reserved.
+
+===========================================================================
+NO LICENCE IS GRANTED
+===========================================================================
+
+This software and everything in it is the exclusive property of the author.
+Possession of a copy grants you no rights in it beyond reading it and running
+it yourself on your own device.
+
+You may NOT, without the author's prior express written permission:
+
+  - copy, reproduce or redistribute this file or any part of it
+  - publish or host it, in whole or in part, publicly or privately
+  - adapt, modify, translate or build upon it
+  - reverse engineer it, or extract any component of it for reuse
+  - incorporate any part of it into another work, product or service
+  - use it, or anything derived from it, for any commercial purpose
+  - train, fine tune or evaluate any machine learning system on it
+
+This applies equally to the source code and to the WRITTEN AND DESIGNED WORK
+it carries: the interface prose, the guide, the visual design, and the seal
+and its dressing. Each of these is an authored work in its own right and is
+protected independently of the code.
+
+WHAT YOU MAY DO
+  - Read the file. It is a single readable file on purpose, so that its claim
+    to work offline and send nothing anywhere can be verified rather than
+    trusted. Readability is a property of the artefact, not an invitation.
+  - Run it for your own work.
+  - Keep your own backups of your own work, which never leaves your device.
+
+IF YOU RECEIVED THIS AS A GIFT
+  It was given to you personally, for your own use. It was not given to you to
+  pass on. If you would like someone else to have a copy, ask the author.
+
+EVERY DISTRIBUTED COPY IS MARKED
+  Each copy carries a build marker, and copies given to a named person carry a
+  marker unique to that copy, recorded against the date it was given. A copy
+  found in circulation can therefore be traced to the copy it came from. This
+  is stated plainly here rather than concealed.
+
+NO WARRANTY
+  The software is provided as is, without warranty of any kind. The author is
+  not liable for any loss arising from its use. Keep your own backups.
+
+PERMISSION
+  Permission for any use not listed above may be granted, and is granted only
+  in writing, by the author. Ask. The answer is sometimes yes.
+
+===========================================================================
+Nothing in this notice limits any right you have that cannot be limited by
+agreement under the law that applies to you.
+===========================================================================

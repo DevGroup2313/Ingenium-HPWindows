@@ -1,0 +1,298 @@
+Ingenium for Windows: build kit
+===============================
+
+Kit made on 11 October 2026 by Ingenium's builder, from the Windows app's
+files (commit 95972bb of yabban-maker/Ingenium-Windows, stored in this page on
+11 October 2026).
+
+IN BRIEF
+
+1. Way A (the easy one): let GitHub build the Windows app. Upload this kit to
+   a new private repository; about 10 minutes later the app waits on the
+   repository's Releases page (section 3).
+2. Way B: build it on the PC itself by double-clicking Build Ingenium
+   (Windows).bat (section 4).
+3. To use Ingenium at once without building anything, double-click
+   ingenium.html in the folder Ingenium-for-Windows. It runs in a browser,
+   with the slower engine inside the page.
+
+1. WHAT THIS KIT IS
+
+This kit holds the Windows version of Ingenium and everything needed to build
+it. The program carries its own engine (llama.cpp's own build for Windows) and
+two built-in models (LFM2.5 1.2B and Qwen3.5 2B, about 2012 MB together), so
+it is useful the moment it opens. The first answers quickly; the second thinks
+before it answers, and the chat shows its thinking. The engine runs models
+many times faster than the engine inside the page, opens model files of any
+size, and also uses the graphics chip where its Vulkan drivers allow.
+
+2. WHAT IS IN THIS KIT
+
+Item | Purpose
+START_HERE.html and START_HERE.txt | This guide, as a web page and as plain
+    text
+Ingenium-for-Windows\ | Everything GitHub (Way A) or the build file (Way B)
+    needs: 27 files
+Ingenium-for-Windows\ingenium.html | The whole app's page in one file
+Ingenium-for-Windows\app.json | Who the app is: its name, its id and its data
+    folder
+Ingenium-for-Windows\desktop_model.json | The built-in models and their
+    checksums
+Ingenium-for-Windows\engine_windows.json | The engine (llama.cpp's own Windows
+    build) and its checksum
+Ingenium-for-Windows\.github\workflows\build-windows.yml | The cloud build
+    (Way A)
+Ingenium-for-Windows\Build Ingenium (Windows).bat | The build file for Way B
+Ingenium-for-Windows\installer\Ingenium.iss | The installer's recipe: the
+    cloud build turns it into Ingenium-Setup.exe with Inno Setup
+Ingenium-for-Windows\tools\ | The build steps: the engine, the model,
+    publishing
+build_file_copy\build-windows.yml.txt | A visible copy of the cloud build
+    file, in case the folder is missed
+
+3. WAY A: LET GITHUB BUILD IT
+
+A1. Create the repository
+
+1. Sign in at github.com. Click + at the top right, then New repository.
+2. Give it a name, for example ingenium-windows.
+3. Choose Private, so only you can see the files. Keep it private.
+4. Leave the other settings as they are and click Create repository.
+
+A2. Upload the files
+
+1. Right-click the kit's zip file and choose Extract All. Open the folder
+   Ingenium-for-Windows.
+2. On the new repository's page, click uploading an existing file.
+3. Select everything inside Ingenium-for-Windows, including the .github
+   folder, and drag it onto the page. In Edge or Chrome the .github folder
+   uploads with the rest.
+4. Wait until every file is listed, then click Commit changes.
+
+If the .github folder did not upload, create the file by hand: click Add file,
+then Create new file, type .github/workflows/build-windows.yml as its name,
+paste the contents of build_file_copy\build-windows.yml.txt, and click Commit
+changes.
+
+A3. Watch the build
+
+Click Actions. The run "Build Ingenium for Windows" starts by itself and takes
+about 8 to 10 minutes (an estimate). A green tick means the program was built
+and passed its test: its own engine had to answer a question with the first
+built-in model, and the second had to think before it answered.
+
+A4. Download and open the program
+
+1. Click Releases (on the right of the repository's main page), then the
+   newest release.
+2. Download Ingenium-Setup.exe, the installer. It needs nothing on the PC: no
+   Python and no administrator password. Ingenium-Windows-with-models.zip
+   (about 2066 MB) holds the same installer with the two built-in models
+   beside it, for a PC without internet: extract it and run the installer
+   inside. Ingenium-Windows-portable.zip is the one-file Ingenium.exe, which
+   needs no installing; it opens more slowly, because it unpacks itself each
+   time.
+3. Double-click Ingenium-Setup.exe. If Edge says the file is not commonly
+   downloaded, choose Keep. If SmartScreen says "Windows protected your PC",
+   click More info, then Run anyway: the installer has not been through a paid
+   signing process.
+4. It installs at once, with no questions, and ends with Open Ingenium now
+   ticked. Ingenium then sits on the Desktop and in the Start menu with its
+   own icon, and Settings, Apps lists it, so it can be removed there like any
+   program.
+5. The first time it opens, it offers to download its two models (about 2 GB,
+   once; a broken download carries on from where it stopped). To update later,
+   run a newer Ingenium-Setup.exe. It never touches your chats, notes,
+   settings or models, and an earlier Python version of Ingenium on the PC is
+   replaced in the same folder.
+
+Which build you have. Tap About at the top right of the app (the round ⓘ key
+on a narrow screen). The version and the build number stand at the bottom of
+About, and again at the end of the Guide, for example "Version 3.0 · build
+20261007.1". The Releases page lists the same number for each app. A matching
+number means the newest build is installed.
+
+Build minutes
+
+On a private repository, GitHub's free plan includes 2,000 build minutes a
+month, and every minute on Windows counts twice. A build takes about 8 to 10
+minutes (it builds, installs, tests, updates and removes the app), so it uses
+about 16 to 20 of the 2,000. A change to these guides starts no build. These
+are GitHub's terms at the time of writing and may change; the billing section
+of your GitHub account settings shows the current ones.
+
+4. WAY B: BUILD IT ON THIS PC
+
+What you need
+
+* Python 3.12 or 3.13. If it is missing, the build file offers to install
+  Python 3.13, or you can install it from https://www.python.org/downloads/
+  (tick Add python.exe to PATH).
+* An internet connection for the first build: it downloads the build tools,
+  the engine (about 40 MB) and the built-in models (about 2012 MB) once, and
+  keeps them.
+
+Steps
+
+1. Extract the zip first. The build file cannot run from inside a zip file.
+2. Double-click Build Ingenium (Windows).bat. A window opens and prints each
+   step.
+3. At the end it tests the program's engine with the built-in models, installs
+   the program in your user folder (AppData\Local\Programs\Ingenium) and puts
+   a shortcut on your Desktop.
+
+If a step cannot be done, the window says why in plain words, and
+build_log.txt in the folder holds the full record.
+
+Way B uses llama.cpp's published Windows engine, which has no trainer, so the
+Models page's "Train a small model from zero" says the trainer is missing in a
+program built this way. The installer that GitHub builds (Way A) carries the
+trainer, which GitHub compiles from the same llama.cpp release.
+
+5. IF THE WINDOW WILL NOT OPEN
+
+The program's window uses the Microsoft Edge WebView2 Runtime, which comes
+with Windows 11 and with updated Windows 10. If it is missing, install
+"Microsoft Edge WebView2 Runtime" from Microsoft's website and start the
+program again. Run Ingenium (Windows).bat opens the same window without
+building, and its console window stays open to show any fault.
+
+6. ADDING MODELS
+
+Ingenium's models. At the top of the Models page, the card "Ingenium's models"
+shows four houses: Velox (the fastest), Scriba (it thinks before it answers),
+Magister (the strongest this PC can hold) and Faber (the coding model). The
+two built-in models are Velox and Scriba. Click Install on another, and the
+program downloads it from Hugging Face, checks it against its fixed
+fingerprint (its SHA-256 value) and keeps it; a download that stops resumes
+where it stopped. With enough memory, Magister is Qwen3.5 9B (about 5.7 GB)
+and Faber is Mellum2 12B-A2.5B Thinking (about 8.1 GB); with less, lighter
+models take their place. The figures shown for each model are its makers' own
+published results.
+
+Convert a model. A model in another form (Hugging Face's safetensors,
+PyTorch's .bin or .pt, or MLX) becomes a GGUF here: choose all the files in
+the model's folder (or the folder itself), choose a size, and click Convert.
+The result matches what llama.cpp's own tools make, and is kept in the
+program's own folder.
+
+Your own models. On the Models page, click the box that says Drop a model file
+here, or click to choose, and choose .gguf files. Each file is linked where it
+already is: nothing is copied, and removing a model from the program never
+deletes the file. If Ollama is installed, the same page offers the models
+Ollama has downloaded.
+
+As a rough guide (an estimate), a model needs about its file size in memory
+plus a little more for its Memory setting. The Models page shows whether each
+model is likely to fit.
+
+7. THIS PC AND THE PHONE AND TABLET APPS
+
+The Fire, iPhone and iPad apps are built on GitHub from their own kits. This
+PC helps with uploading those kits (Edge or Chrome uploads the .github folder
+with the rest) and with installing the iPhone and iPad app with Sideloadly.
+
+Lending this PC's models to your other devices. In Ingenium, Settings, Your
+models on every device, switch on Share this computer's models. It shows an
+address and a pairing code; enter them on the laptop, tablet or phone in the
+same card, under Use another computer's models, and press Connect. That
+device's chat then uses this PC's models over your home Wi-Fi, from another
+room. Keep Ingenium open here; while sharing is on, the PC does not go to
+sleep by itself. If the PC asks whether Ingenium may accept incoming
+connections (Windows Firewall, on private networks), allow it. Nothing leaves
+your home network, and only devices with the code are answered.
+
+8. YOUR COPY ON GITHUB
+
+The repository yabban-maker/Ingenium-Windows holds the same files. Keep it
+private, so only you can see them (on GitHub: Settings, then General, then
+Change visibility at the bottom). When this kit was made, the newest work sat
+on the branch claude/magical-darwin-ppq4pn. To make it the main version:
+
+1. Open https://github.com/yabban-maker/Ingenium-Windows and click Pull
+   requests, then New pull request.
+2. Set base to main and compare to claude/magical-darwin-ppq4pn.
+3. Click Create pull request twice, then Merge pull request and Confirm merge.
+
+9. IF SOMETHING GOES WRONG
+
+Problem | What to do
+The cloud build shows a red cross | Click the run, then the failed step; its
+    last lines name the cause. A failed test publishes nothing.
+The build file stops early | It writes everything to build_log.txt and shows
+    the last lines. The usual causes: a Python that is too new (install 3.12
+    or 3.13 beside it) or no connection.
+The engine could not be downloaded | The program is built anyway and uses the
+    slower engine inside the page. Run the build file again when online.
+The window stays empty or closes at once | The program writes
+    ingenium_crash.log beside itself when something fails.
+
+10. WHAT WAS AND WAS NOT CHECKED
+
+Version 3.2 (10 October 2026) has not been built on GitHub yet: GitHub's build
+machines were not available when this kit was made, so these build files have
+not been run in the cloud for 3.2, and no 3.2 app has been tested on a PC.
+What was checked for 3.2, on a Linux computer: the app's own code trained a
+small model from zero with llama.cpp's trainer (release b11321, compiled with
+this kit's own settings): two passes over about 27,000 characters took about 8
+seconds, the loss fell after each pass, and the app's engine then continued a
+sentence with the trained model; the Train a small model from zero lesson
+passed 21 checks against the real trainer and engine, including training
+further and closing its window while it trains; the app's page passed its
+tests in Chromium on Linux, with the real engine (llama.cpp) running LFM2.5
+1.2B Instruct where a model was needed: Ingenium's ten rules reach every
+model's instructions (20 checks) and come before the person's own layer (9
+checks); tooltips above each control, in each page's own colours and font (15
+checks); the new sticky note papers, Lavender first, with their names (7
+checks); pasting from outside through the edit panel (12 checks, with a
+stand-in for the app's clipboard); the first reply no longer waits for the
+instructions (5 checks); building your own AI on top of a model (18 checks);
+the model lineup for each device (45 checks); Support (33 checks); the
+first-start downloads (24 checks); and the guided tour (22 checks). The
+converter turned LFM2.5 350M and Gemma 3 270M into F16, Q8_0 and Q4_K_M files
+identical byte for byte to those of llama.cpp's own converter and quantizer,
+in the browser, the Fire app and the computer app (27 checks each), and both
+converted models answered correctly. llama.cpp's published Windows engine,
+which the build downloads and checks against its SHA-256, was confirmed to
+carry no trainer, so GitHub's build compiles the trainer with Microsoft's
+compiler; that step has not run yet. The edit panel's clipboard code has not
+been run on Windows. The last build that passed on GitHub is version 3.1: The
+Windows app was built and tested on GitHub on 9 October 2026 (build
+3.1.20261009.13, at commit 3cdf465, on GitHub's Windows Server 2025). Its main
+download is Ingenium-Setup.exe (about 35 MB), an installer that needs no
+Python and no administrator password. On that machine, standing in for a
+laptop that had the earlier Python version: the installer ran without
+questions and finished in about 60 seconds with the two models beside it; it
+removed the Python version's files from the same folder, pointed the Desktop
+and Start menu shortcuts at the installed Ingenium.exe, put the engine beside
+it, and listed the app in Settings, Apps as version 3.1.20261009.13. The
+installed app's own engine loaded LFM2.5 1.2B Instruct in about 6.6 seconds,
+answered "Paris" to "What is the capital of France?" and refused a request
+without the session's key, and Qwen3.5 2B thought before answering "Is 91 a
+prime number?". From start to the engine's first answer, the installed app
+took 2.03, 0.60 and 0.59 seconds in three runs, against 4.24, 1.98 and 1.75
+seconds for the portable one-file Ingenium.exe. Run again as an update, the
+installer finished in about 15 seconds and kept the models; removed through
+its uninstaller, the app, its shortcuts and its entry in Settings, Apps were
+gone. Each time, stand-ins for the user's own files were kept. Lending its
+models: the installed app opened its door on the network (10.1.0.124, port
+17860), refused a wrong pairing code, and answered "Paris" through the door,
+its first word arriving after about 0.54 seconds. Given Velox's speed-up file,
+the app left it unused, as intended on a machine whose engine runs on the
+processor. This build is version 3.1 and carries the look approved on 9
+October 2026: chat bubbles that rise into place with a small spring when they
+first appear, lift under the pointer and breathe gently while an answer is
+being written (minimal motion and the system's reduce-motion setting turn this
+off); the raised 3D look with light shadows; and no purple glow around the
+door's seal, the purple keys or the app's icon, by day or by night. The look
+was checked in Chromium on Linux in day and night, on a computer screen and a
+phone screen. The guided tour (22 checks), Support (33 checks), the
+first-start downloads (24 checks) and the live thinking view (10 checks) were
+tested again in Chromium on Linux on this page. The build file "Build Ingenium
+(Windows).bat" now writes its own build number (3.1, the day and the time)
+into the page; that line has not been run on a Windows computer, because the
+file itself is not run on GitHub; if it fails, the build carries on without
+the number. The installer has not been run on a real Windows laptop, where
+SmartScreen will ask once (the installer is not code-signed) and antivirus
+checks may make it slower; the app's window has not been opened on one, and no
+Windows graphics chip has been tested.

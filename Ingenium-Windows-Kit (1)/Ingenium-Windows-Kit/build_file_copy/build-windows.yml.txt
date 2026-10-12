@@ -1,0 +1,318 @@
+# INGENIUM  |  Copyright (c) 2026 Yannie D. Forest. All rights reserved.
+# NO LICENCE IS GRANTED. See LICENCE.txt.
+#
+# Builds the Windows app in GitHub's cloud: the native engine (llama.cpp's own
+# published Windows build, checked against its SHA-256), the built-in models,
+# the app itself; then the app must answer a question with its own engine
+# before it is published on the Releases page.
+#
+# R75: the main download is Ingenium-Setup.exe, a real Windows installer that
+# needs nothing on the PC (no Python, no administrator rights). It carries the
+# app as a folder, so the app opens at once instead of unpacking itself, with
+# its engine unpacked beside it. This build installs it the way a laptop
+# would (over what the old Python version left), tests the installed app,
+# runs it again as an update, removes it as Settings, Apps would, and checks
+# that the user's own files survive all of that.
+name: Build Ingenium for Windows
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'ingenium.html'
+      - 'ingenium_app.py'
+      - 'ingenium_win.spec'
+      - 'app.json'
+      - 'desktop_model.json'
+      - 'engine_windows.json'
+      - 'tools/**'
+      - 'installer/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Read who the app is (app.json)
+        run: |
+          echo "APP_NAME=$(python tools/app_name.py name)" >> "$GITHUB_ENV"
+          echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
+          echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
+          # the build number: the version, the day and this repository's run number
+          echo "INGENIUM_VERSION=3.2.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          # Windows' own file version allows no part above 65535
+          echo "INGENIUM_VERNUM=3.2.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Get the engine (llama.cpp's Windows build, checked)
+        run: python tools/get_engine_windows.py engine/windows-x64.zip
+
+      # R78: llama.cpp's trainer (llama-finetune.exe), for "Train a small model
+      # from zero". llama.cpp's published Windows build does not carry it, so
+      # it is compiled here from the same release (b11321, checked by its
+      # commit): for the processor only, as one program needing no other
+      # files, and kept in the build cache so it is compiled once.
+      - name: The trainer, from the build cache when it was compiled before
+        id: trainer
+        uses: actions/cache@v4
+        with:
+          path: engine-trainer/windows-x64
+          key: trainer-windows-x64-b11321-v1
+
+      - name: Compile the trainer (llama.cpp b11321; only when not cached)
+        if: steps.trainer.outputs.cache-hit != 'true'
+        run: |
+          src="$RUNNER_TEMP/llama.cpp-b11321"
+          git -c advice.detachedHead=false clone --quiet --depth 1 --branch b11321 https://github.com/ggml-org/llama.cpp "$src"
+          got="$(git -C "$src" rev-parse HEAD)"
+          case "$got" in b0aca3c*) echo "Source checked: commit ${got:0:7}." ;; *) echo "::error::the source is not the expected commit ($got)"; exit 1 ;; esac
+          cmake -S "$src" -B "$RUNNER_TEMP/trainer-build" -A x64 -DBUILD_SHARED_LIBS=OFF -DLLAMA_OPENSSL=OFF \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF \
+            -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded > "$RUNNER_TEMP/trainer-cmake.log" 2>&1 \
+            || { tail -40 "$RUNNER_TEMP/trainer-cmake.log"; exit 1; }
+          cmake --build "$RUNNER_TEMP/trainer-build" --config Release --target llama-finetune -j 4 > "$RUNNER_TEMP/trainer-build.log" 2>&1 \
+            || { tail -60 "$RUNNER_TEMP/trainer-build.log"; exit 1; }
+          mkdir -p engine-trainer/windows-x64
+          cp "$RUNNER_TEMP/trainer-build/bin/Release/llama-finetune.exe" engine-trainer/windows-x64/
+          ls -la engine-trainer/windows-x64
+
+      - name: The trainer goes into the engine pack
+        run: |
+          python - <<'EOF'
+          import zipfile
+          with zipfile.ZipFile("engine/windows-x64.zip", "a", zipfile.ZIP_DEFLATED) as z:
+              if "llama-finetune.exe" not in z.namelist():
+                  z.write("engine-trainer/windows-x64/llama-finetune.exe", "llama-finetune.exe")
+              print("The engine pack holds: " + ", ".join(n for n in z.namelist() if n.endswith(".exe")))
+          EOF
+
+      - name: Training from zero (R78), through the app's own code with its own engine
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          echo "### Training a small model from zero" >> "$GITHUB_STEP_SUMMARY"
+          python tools/train_smoke.py | tee -a "$GITHUB_STEP_SUMMARY"
+          exit ${PIPESTATUS[0]}
+
+      - name: The built-in models, from the build cache when they were downloaded before
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ingenium-models
+          key: model-${{ hashFiles('desktop_model.json') }}
+
+      - name: Install the build tools
+        run: python -m pip install --disable-pip-version-check pyinstaller==6.22.3 pywebview==6.2.1 pythonnet==3.2.0
+
+      - name: The edit panel's clipboard (R78), copied and pasted through the app's own code
+        continue-on-error: true
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          python - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import sys
+          sys.path.insert(0, ".")
+          import ingenium_app as a
+          t = "Ingenium paste test \u2713 https://example.org/live?id=42&ref=outside"
+          w = a._clipboard_write(t)
+          r = a._clipboard_read()
+          ok = bool(w.get("ok")) and bool(r.get("ok")) and r.get("text") == t
+          print("* Clipboard through the app: %s (write %s; read back %s)" % ("works" if ok else "FAILED", w, ascii((r.get("text") if r.get("ok") else r.get("error")) or "")[:90]))
+          sys.exit(0 if ok else 1)
+          EOF
+
+      - name: Build the app (one portable file, and the folder the installer carries)
+        run: |
+          python tools/stamp_build.py ingenium.html "$INGENIUM_VERSION"
+          python -m PyInstaller --noconfirm --clean ingenium_win.spec
+          INGENIUM_ONEDIR=1 python -m PyInstaller --noconfirm --clean ingenium_win.spec
+          test -f "dist/$APP_FILE.exe"
+          test -f "dist/$APP_FILE/$APP_FILE.exe"
+          du -sh "dist/$APP_FILE.exe" "dist/$APP_FILE"
+
+      - name: The engine, unpacked for the installer, and the built-in models
+        run: |
+          mkdir -p "$RUNNER_TEMP/engine/windows-x64"
+          7z x -y -o"$RUNNER_TEMP/engine/windows-x64" engine/windows-x64.zip > /dev/null
+          test -f "$RUNNER_TEMP/engine/windows-x64/llama-server.exe"
+          # the built-in models must be the ones the page's lineup names (R70)
+          python tools/check_lineup.py
+          python tools/prepare_desktop_model.py "$RUNNER_TEMP/models" desktop
+          ls -la "$RUNNER_TEMP/models"
+
+      - name: Make Ingenium-Setup.exe (Inno Setup)
+        shell: pwsh
+        run: |
+          function Find-Iscc { @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+          $iscc = Find-Iscc
+          if (-not $iscc) { choco install innosetup -y --no-progress | Out-Null; $iscc = Find-Iscc }
+          if (-not $iscc) { Write-Output "::error::Inno Setup could not be installed"; exit 1 }
+          Write-Output "Inno Setup: $iscc $((Get-Item $iscc).VersionInfo.ProductVersion)"
+          $out = Join-Path $env:RUNNER_TEMP 'setup'
+          & $iscc /Qp "/DAppName=$env:APP_NAME" "/DAppFile=$env:APP_FILE" "/DAppIdent=$env:APP_ID" `
+            "/DAppVersion=$env:INGENIUM_VERSION" "/DVerNum=$env:INGENIUM_VERNUM" "/DRepoDir=$PWD" `
+            "/DSrcDir=$(Join-Path $PWD "dist\$env:APP_FILE")" "/DEngineDir=$(Join-Path $env:RUNNER_TEMP 'engine\windows-x64')" `
+            "/DOutDir=$out" installer\Ingenium.iss
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error::the installer could not be made"; exit 1 }
+          $setup = Get-Item (Join-Path $out "$env:APP_FILE-Setup.exe")
+          Write-Output ("Made {0}: {1:N1} MB" -f $setup.Name, ($setup.Length / 1MB))
+
+      - name: Install it as on a laptop that had the Python version, and test the installed app
+        shell: pwsh
+        run: |
+          function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
+          $inst = Join-Path $env:LOCALAPPDATA "Programs\$env:APP_FILE"
+          $desk = Join-Path ([Environment]::GetFolderPath('Desktop')) "$env:APP_NAME.lnk"
+          $menu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\$env:APP_NAME.lnk"
+          # 1. what the Python version left in the same folder, and its shortcuts to Python
+          New-Item -ItemType Directory -Force -Path (Join-Path $inst '__pycache__'), (Join-Path $inst 'engine\windows-x64') | Out-Null
+          foreach ($f in @('launch.pyw', 'ingenium_app.py', "$env:APP_FILE.bat", 'install.json', '__pycache__\ingenium_app.pyc', 'engine\windows-x64\old-part.dll')) { 'old' | Set-Content (Join-Path $inst $f) }
+          $ws = New-Object -ComObject WScript.Shell
+          foreach ($l in @($desk, $menu)) { $sc = $ws.CreateShortcut($l); $sc.TargetPath = (Join-Path $env:pythonLocation 'pythonw.exe'); $sc.Arguments = '"' + (Join-Path $inst 'launch.pyw') + '"'; $sc.Save() }
+          # 2. the user's own things, which must survive everything below
+          $mine = @((Join-Path $env:LOCALAPPDATA "$env:APP_FILE\storage\keep-me.txt"), (Join-Path $env:APPDATA "$env:APP_FILE\models\keep-me.txt"))
+          foreach ($m in $mine) { New-Item -ItemType Directory -Force (Split-Path $m) | Out-Null; 'mine' | Set-Content $m }
+          # 3. the copy for a PC without internet: the installer with the models folder beside it
+          $full = Join-Path $env:RUNNER_TEMP "full\$env:APP_FILE"
+          New-Item -ItemType Directory -Force $full | Out-Null
+          Copy-Item (Join-Path $env:RUNNER_TEMP "setup\$env:APP_FILE-Setup.exe") $full
+          Move-Item (Join-Path $env:RUNNER_TEMP 'models') (Join-Path $full 'models')
+          $log = Join-Path $env:RUNNER_TEMP 'install-1.log'
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $ip = Start-Process -FilePath (Join-Path $full "$env:APP_FILE-Setup.exe") -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$log") -Wait -PassThru
+          $sw.Stop()
+          $exe = Join-Path $inst "$env:APP_FILE.exe"
+          $oldGone = -not ((Test-Path (Join-Path $inst 'launch.pyw')) -or (Test-Path (Join-Path $inst 'ingenium_app.py')) -or (Test-Path (Join-Path $inst "$env:APP_FILE.bat")) -or (Test-Path (Join-Path $inst '__pycache__')) -or (Test-Path (Join-Path $inst 'engine\windows-x64\old-part.dll')))
+          $tDesk = if (Test-Path $desk) { $ws.CreateShortcut($desk).TargetPath } else { '' }
+          $tMenu = if (Test-Path $menu) { $ws.CreateShortcut($menu).TargetPath } else { '' }
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$($env:APP_ID)_is1"
+          $listed = Test-Path $key
+          $ver = if ($listed) { (Get-ItemProperty $key).DisplayVersion } else { '' }
+          $models = Test-Path (Join-Path $inst 'models\builtin.json')
+          $engine = Test-Path (Join-Path $inst 'engine\windows-x64\llama-server.exe')
+          $kept = -not ($mine | Where-Object { -not (Test-Path $_) })
+          Note "### Ingenium-Setup.exe: first install"
+          Note ("* Installed in {0:N1} s (with the models folder beside it), exit code {1}" -f $sw.Elapsed.TotalSeconds, $ip.ExitCode)
+          Note "* Program: $(Test-Path $exe); engine beside it: $engine; built-in models: $models"
+          Note "* The Python version's files removed: $oldGone"
+          Note "* Shortcuts now open: Desktop $tDesk; Start menu $tMenu"
+          Note "* Listed in Settings, Apps: $listed (version $ver)"
+          Note "* The user's own files kept: $kept"
+          if ($ip.ExitCode -ne 0 -or -not (Test-Path $exe)) { Get-Content $log -Tail 40; Write-Output "::error::the installer did not install the app"; exit 1 }
+          if (-not ($oldGone -and $listed -and $models -and $engine -and $kept)) { Get-Content $log -Tail 40; Write-Output "::error::the install is not complete"; exit 1 }
+          if ($tDesk -ne $exe -or $tMenu -ne $exe) { Write-Output "::error::the shortcuts do not open the installed app"; exit 1 }
+          # 4. the installed app's own test: its engine answers with a built-in model, its thinking model thinks,
+          #    Velox's speed-up file is tried (for the record only), and it lends its models over the network
+          $res = Join-Path $env:RUNNER_TEMP 'selftest.json'
+          $arg = @('--selftest-model', 'builtin', '--selftest-out', $res)
+          $spd = Join-Path $env:RUNNER_TEMP 'speedup.gguf'
+          try { Invoke-WebRequest -Uri "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-DSpark-GGUF/resolve/main/LFM2.5-1.2B-Instruct-DSpark-Q4_K_M.gguf" -OutFile $spd -MaximumRetryCount 4 -RetryIntervalSec 5
+                if ((Get-FileHash $spd -Algorithm SHA256).Hash.ToLower() -ne "5cf9bb2947638dd74a47b486b817f407831c0da420aeebb6973fb66c25af51e4") { Remove-Item $spd } } catch { Write-Output "speed-up file not fetched: $_" }
+          if (Test-Path $spd) { $arg += @('--selftest-drafter', $spd) }
+          $arg += @('--selftest-share')
+          $p = Start-Process -FilePath $exe -ArgumentList $arg -WorkingDirectory $inst -Wait -PassThru
+          $r = Get-Content $res -Raw | ConvertFrom-Json
+          $t = $r.timings
+          Note ("### The installed app's self-test " + $(if ($r.ok) { "passed" } else { "FAILED" }))
+          Note ("* Engine: " + $r.engine.version + ", " + $r.engine.platform + "; graphics chips: " + (($r.devices | ForEach-Object { $_.name }) -join ', '))
+          Note ("* Model: " + $r.builtin.name + ", loaded in " + $r.load_seconds + " s")
+          Note ("* Reply: ``" + $r.reply + "`` at " + [math]::Round([double]$t.predicted_per_second, 1) + " tokens a second")
+          Note ("* Refuses requests without the session key: " + $r.locked)
+          if ($r.think) { Note ("* Thinking model " + $r.think.model + " thought (" + $r.think.chars + " characters)") }
+          if ($r.speedup) { $sp = $r.speedup; Note ("* Speed-up file: " + $(if ($sp.used) { "used" } else { "NOT used" }) + "; " + [math]::Round([double]$sp.without.per_second, 1) + " and " + [math]::Round([double]$sp.again.per_second, 1) + " tokens a second without it (before and after), " + [math]::Round([double]$sp.with.per_second, 1) + " with it; same reply: " + $sp.same_reply) }
+          if ($r.share) { $sh = $r.share; Note ("* Lending its models to other devices: " + $(if ($sh.ok) { "works" } else { "FAILED" }) + "; reached at " + $sh.address + $(if ($sh.over_network) { " (over the network)" } else { " (on this machine only)" }) + "; wrong code refused: " + $sh.refuses_wrong_code + "; reply ``" + $sh.reply + "``, first word after " + $sh.first_word_seconds + " s") }
+          if ($r.error) { Note ("* Error: " + $r.error) }
+          Get-Content $res
+          if ($p.ExitCode -ne 0 -or -not $r.ok) { Write-Output "::error::the installed app's engine did not answer correctly"; exit 1 }
+
+      - name: How long each app takes to start (installed app against the portable exe)
+        shell: pwsh
+        run: |
+          function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
+          # from pressing start until the app's own code has run and its engine
+          # has answered: both run the same self-test with no model
+          $inst = Join-Path $env:LOCALAPPDATA "Programs\$env:APP_FILE"
+          $installed = Join-Path $inst "$env:APP_FILE.exe"
+          $portable = Join-Path $PWD "dist\$env:APP_FILE.exe"
+          function Time-It($file, $dir) {
+            $o = Join-Path $env:RUNNER_TEMP 't.json'
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            $p = Start-Process -FilePath $file -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $dir -Wait -PassThru
+            $sw.Stop()
+            if ($p.ExitCode -ne 0) { Get-Content $o; Write-Output "::error::$file did not start its engine"; exit 1 }
+            return [math]::Round($sw.Elapsed.TotalSeconds, 2) }
+          Note "### Start-up time (to the engine's first answer)"
+          Note "| Run | Installed app | Portable $env:APP_FILE.exe |"
+          Note "| --- | --- | --- |"
+          foreach ($i in 1..3) { $a = Time-It $installed $inst; $b = Time-It $portable (Split-Path $portable); Note "| $i | $a s | $b s |" }
+
+      - name: Run the installer again (an update), then remove the app as Settings, Apps would
+        shell: pwsh
+        run: |
+          function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
+          $inst = Join-Path $env:LOCALAPPDATA "Programs\$env:APP_FILE"
+          $exe = Join-Path $inst "$env:APP_FILE.exe"
+          $desk = Join-Path ([Environment]::GetFolderPath('Desktop')) "$env:APP_NAME.lnk"
+          $menu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\$env:APP_NAME.lnk"
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$($env:APP_ID)_is1"
+          $mine = @((Join-Path $env:LOCALAPPDATA "$env:APP_FILE\storage\keep-me.txt"), (Join-Path $env:APPDATA "$env:APP_FILE\models\keep-me.txt"))
+          # the update: the installer alone, as downloaded, over the installed app
+          $log = Join-Path $env:RUNNER_TEMP 'install-2.log'
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $ip = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP "setup\$env:APP_FILE-Setup.exe") -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$log") -Wait -PassThru
+          $sw.Stop()
+          $o = Join-Path $env:RUNNER_TEMP 'u.json'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $inst -Wait -PassThru
+          $models = Test-Path (Join-Path $inst 'models\builtin.json')
+          $kept = -not ($mine | Where-Object { -not (Test-Path $_) })
+          Note "### Ingenium-Setup.exe run again (an update)"
+          Note ("* Updated in {0:N1} s, exit code {1}; the app starts its engine: {2}; built-in models kept: {3}; the user's own files kept: {4}" -f $sw.Elapsed.TotalSeconds, $ip.ExitCode, ($p.ExitCode -eq 0), $models, $kept)
+          if ($ip.ExitCode -ne 0 -or $p.ExitCode -ne 0 -or -not $models -or -not $kept) { Get-Content $log -Tail 40; Write-Output "::error::the update did not work"; exit 1 }
+          # removal: the uninstaller Settings, Apps runs (it hands over to a copy of itself and returns at once)
+          $un = (Get-ItemProperty $key).UninstallString.Trim('"')
+          Start-Process -FilePath $un -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait
+          foreach ($i in 1..90) { if (-not (Test-Path $exe) -and -not (Test-Path $key)) { break }; Start-Sleep -Seconds 1 }
+          $gone = -not (Test-Path $exe)
+          $links = (Test-Path $desk) -or (Test-Path $menu)
+          $listed = Test-Path $key
+          $kept = -not ($mine | Where-Object { -not (Test-Path $_) })
+          Note "### Removed through its uninstaller"
+          Note "* Program removed: $gone; shortcuts removed: $(-not $links); no longer listed in Settings, Apps: $(-not $listed); the user's own files kept: $kept"
+          if (Test-Path $inst) { Note "* Left in the program folder: $((Get-ChildItem -Recurse $inst | Select-Object -First 8 | ForEach-Object { $_.FullName.Substring($inst.Length) }) -join ', ')" }
+          if (-not ($gone -and -not $links -and -not $listed -and $kept)) { Write-Output "::error::removing the app did not work as it should"; exit 1 }
+
+      - name: Zip the copy with the models, and the portable exe
+        run: |
+          cd "$RUNNER_TEMP/full" && 7z a -tzip -mx=1 "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "$APP_FILE" > /dev/null
+          mkdir -p "$RUNNER_TEMP/portable/$APP_FILE"
+          cp "$GITHUB_WORKSPACE/dist/$APP_FILE.exe" "$RUNNER_TEMP/portable/$APP_FILE/"
+          cd "$RUNNER_TEMP/portable" && 7z a -tzip -mx=5 "$RUNNER_TEMP/${APP_FILE}-Windows-portable.zip" "$APP_FILE" > /dev/null
+          ls -la "$RUNNER_TEMP"/*.zip "$RUNNER_TEMP/setup"
+
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -- "$RUNNER_TEMP/setup/${APP_FILE}-Setup.exe" "${APP_FILE}-Setup.exe" \
+                 "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "${APP_FILE}-Windows-with-models.zip" \
+                 "$RUNNER_TEMP/${APP_FILE}-Windows-portable.zip" "${APP_FILE}-Windows-portable.zip"
+          # R75: the Python-based package and the older name are retired
+          OBSOLETE="${APP_FILE}-Windows.zip ${APP_FILE}-Windows-no-model.zip" bash tools/publish_release.sh Windows "$@"

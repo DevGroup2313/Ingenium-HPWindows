@@ -1,0 +1,7 @@
+{
+  "_about": "The Windows app's native engine: llama.cpp's own published build of release b11321 for Windows (x64; it carries the Vulkan graphics backend and chooses the best processor instructions by itself). tools/get_engine_windows.py downloads it once and refuses it unless its SHA-256 matches. The checksum was taken from GitHub's first download of it, on 1 October 2026.",
+  "tag": "b11321",
+  "asset": "llama-b11321-bin-win-vulkan-x64.zip",
+  "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11321/llama-b11321-bin-win-vulkan-x64.zip",
+  "sha256": "35ee023c2007e65a93f8c9aaa54c846eaadf97adff4332c7ea50a96720f4b2ef"
+}

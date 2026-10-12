@@ -1,0 +1,7 @@
+{
+  "_about": "Who this app is. The Windows app build reads this file (the program's file name, its window title and its data folder), as the phone and tablet builds read theirs. Ingenium's own builder writes a new one for each new app it packages.",
+  "name": "Ingenium",
+  "app_id": "com.yannieforest.ingenium",
+  "file_name": "Ingenium",
+  "test": "model"
+}

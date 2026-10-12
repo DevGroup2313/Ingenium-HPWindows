@@ -1,0 +1,124 @@
+INGENIUM: THIRD-PARTY NOTICES
+=============================
+
+Ingenium itself is the work of Yannie D. Forest; see LICENCE.txt. The apps
+also carry the following open-source software and models, under their own
+licences, reproduced here as those licences require.
+
+1. llama.cpp (the native engine in every Ingenium app: Android, Fire, iPhone,
+   iPad, Mac and Windows)
+   https://github.com/ggml-org/llama.cpp, release b11321
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2023-2026 The ggml authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+   llama.cpp includes nlohmann/json (MIT):
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2013-2025 Niels Lohmann
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+   The page's model converter (from version 3.0) carries quantization routines
+   adapted from llama.cpp's ggml-quants.c, in JavaScript and compiled to
+   WebAssembly, under the same MIT licence and copyright notice as above. Its
+   list of tokenizer fingerprints comes from llama.cpp's converter
+   (conversion/base.py), under the same licence.
+
+2. wllama (the WebAssembly engine inside ingenium.html: the engine in a
+   browser, and the fallback in the desktop apps),
+   https://github.com/ngxson/wllama, version 3.6.1
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2024 Xuan Son NGUYEN
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+3. AndroidX WebKit (Android and Fire app), Apache License 2.0
+   https://developer.android.com/jetpack/androidx/releases/webkit
+   The full text of the Apache License 2.0 is in licences/Apache-2.0-Qwen3.5.txt.
+
+4. Built-in models (two in each app, from version 3.0)
+   - LFM2.5 1.2B Instruct by Liquid AI, in every app, and LFM2.5 1.2B
+     Thinking by Liquid AI, in the Android and Fire app: under the LFM Open
+     License v1.0 (licences/LFM-Open-License-v1.0.txt). It permits use and
+     redistribution; commercial use is limited to organisations with annual
+     revenue under 10 million US dollars.
+   - Qwen3.5 2B by the Qwen team (Alibaba Cloud), in the iPhone, iPad, Mac
+     and Windows apps: under the Apache License 2.0
+     (licences/Apache-2.0-Qwen3.5.txt).
+   Models installed later from the Models page are not carried in the apps;
+   each is downloaded from Hugging Face only when asked for, under its own
+   licence: LFM2.5 2.6B (Liquid AI, LFM Open License v1.0), Qwen3.5 4B and
+   Qwen3.5 9B (the Qwen team, Apache License 2.0) and Mellum2 12B-A2.5B
+   Thinking (JetBrains, Apache License 2.0).
+   On the Mac and Windows apps, the optional speed-up files are Liquid AI's
+   DSpark draft models for LFM2.5 1.2B Instruct and LFM2.5 2.6B, also
+   downloaded only when asked for, under the LFM Open License v1.0.
+
+5. The Mac and Windows apps' window and packaging
+   These are carried inside the desktop apps, each under its own licence
+   (the texts are at the addresses given):
+   - Python, Python Software Foundation License, https://docs.python.org/3/license.html
+   - pywebview, BSD 3-Clause License, https://github.com/r0x0r/pywebview
+   - PyInstaller's bootloader, GPL 2.0 with an exception that permits
+     distributing programs built with it, https://pyinstaller.org/en/stable/license.html
+   - pythonnet (Windows), MIT License, https://github.com/pythonnet/pythonnet
+   - PyObjC (Mac), MIT License, https://github.com/ronaldoussoren/pyobjc
+   - certifi, Mozilla Public License 2.0, https://github.com/certifi/python-certifi
+   - The LLVM OpenMP runtime (libomp, inside the Windows engine), Apache
+     License 2.0 with LLVM Exceptions, https://openmp.llvm.org; its licence
+     text travels with the engine as LICENSE-LLVM-OpenMP.
