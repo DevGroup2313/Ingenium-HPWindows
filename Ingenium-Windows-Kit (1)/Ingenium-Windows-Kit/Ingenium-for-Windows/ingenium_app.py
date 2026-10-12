@@ -1329,6 +1329,19 @@ class IngeniumApi:
     def save_state(self, raw):
         return _save_state(raw)
 
+    # R81: big texts, kept apart from the desk (see _big_put above).
+    def big_put(self, bid, text):
+        return _big_put(bid, text)
+
+    def big_get(self, bid):
+        return _big_get(bid)
+
+    def big_del(self, bid):
+        return _big_del(bid)
+
+    def big_gc(self, live):
+        return _big_gc(live)
+
     def close_app(self, which):
         """Close a native instrument window."""
         if which not in self.APP_TITLES:
@@ -1521,6 +1534,19 @@ class IngeniumApiSingle:
 
     def save_state(self, raw):
         return _save_state(raw)
+
+    # R81: big texts, kept apart from the desk (see _big_put above).
+    def big_put(self, bid, text):
+        return _big_put(bid, text)
+
+    def big_get(self, bid):
+        return _big_get(bid)
+
+    def big_del(self, bid):
+        return _big_del(bid)
+
+    def big_gc(self, live):
+        return _big_gc(live)
 
 
 def _read_html_text(path):
@@ -3319,6 +3345,94 @@ def _save_state(raw):
     except Exception:
         log_problem("save_state failed", sys.exc_info())
         return False
+
+
+# R81: big texts (a whole app pasted or attached, a page kept for the
+# preview) live apart from the desk, one file each, in a folder beside it.
+# The page keeps them in its own store as well; this copy is the one that
+# survives a web view whose storage forgets.
+_BIG_ID = re.compile(r"^big_[a-z0-9]{7,40}$")
+
+
+def _big_dir():
+    p = _desk_path()
+    if p is None:
+        return None
+    d = p.parent / "big"
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return None
+    return d
+
+
+def _big_file(bid):
+    if not isinstance(bid, str) or not _BIG_ID.match(bid):
+        return None
+    d = _big_dir()
+    return None if d is None else d / (bid + ".txt")
+
+
+def _big_put(bid, text):
+    f = _big_file(bid)
+    if f is None:
+        return {"ok": False, "error": "no place to keep it"}
+    txt = text if isinstance(text, str) else str(text)
+    if len(txt) > 64 * 1024 * 1024:
+        return {"ok": False, "error": "too large to keep on disk"}
+    try:
+        tmp = str(f) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(txt)
+        os.replace(tmp, str(f))
+        return {"ok": True}
+    except Exception:
+        log_problem("big_put failed", sys.exc_info())
+        return {"ok": False, "error": "it could not be written"}
+
+
+def _big_get(bid):
+    f = _big_file(bid)
+    try:
+        if f is not None and f.is_file():
+            return {"ok": True, "text": f.read_text(encoding="utf-8")}
+    except Exception:
+        log_problem("big_get failed", sys.exc_info())
+    return {"ok": False, "error": "not kept here"}
+
+
+def _big_del(bid):
+    f = _big_file(bid)
+    try:
+        if f is not None and f.is_file():
+            f.unlink()
+        return True
+    except Exception:
+        return False
+
+
+def _big_gc(live):
+    """Let go of what the desk no longer names, ten minutes after it was
+    written at the earliest (a text being sent is never let go)."""
+    d = _big_dir()
+    if d is None:
+        return 0
+    keep = set(x for x in (live or []) if isinstance(x, str))
+    now = time.time()
+    gone = 0
+    try:
+        for f in d.glob("big_*.txt"):
+            if f.stem in keep:
+                continue
+            try:
+                if now - f.stat().st_mtime > 600:
+                    f.unlink()
+                    gone += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return gone
 
 
 def _start_local_server(directory, html_name=None):

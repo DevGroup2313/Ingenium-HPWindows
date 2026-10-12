@@ -663,8 +663,8 @@ body[data-theme="night"] .seg-btn.active{color:var(--accent-bright)}
 .pv-frame-wrap[data-lived="1"] #pvEmpty{display:none}
 .pv-frame-wrap::after{content:""; position:absolute; top:0;right:0;bottom:0;left:0; pointer-events:none;
   background:rgba(20,22,26,0); transition:background .2s}
-body[data-pvdim="1"] .pv-frame-wrap::after{background:rgba(20,22,26,.14)}
-body[data-theme="night"][data-pvdim="1"] .pv-frame-wrap::after{background:rgba(8,9,12,.34)}
+body[data-pvdim="1"] #frameWrap::after{background:rgba(20,22,26,.14)}
+body[data-theme="night"][data-pvdim="1"] #frameWrap::after{background:rgba(8,9,12,.34)}
 body[data-pvdim="1"] #dimPreview{color:var(--accent); font-weight:700}
 /* the preview by night: the frame and its surround are black */
 body[data-theme="night"] .pv-frame-wrap, body[data-theme="night"] #previewFrame{background:#000 !important}
@@ -696,33 +696,33 @@ body[data-theme="night"] .stage-foot .cl{color:var(--accent-bright); border-colo
     0 1px 0 rgba(0,0,0,.25), 0 3px 4px rgba(0,0,0,.22), 0 7px 10px rgba(0,0,0,.16)}
 body[data-theme="night"] .stage-foot .cl:hover{background:linear-gradient(180deg,rgba(53,42,65,.9),rgba(183,156,230,.12))}
 /* folded: the bar alone */
-body[data-buildfold="1"] .pv-frame-wrap, body[data-buildfold="1"] .console,
-body[data-buildfold="1"] .stage-foot{display:none !important}
-body[data-buildfold="1"] .preview-pane{flex:0 0 auto; min-height:0}
-body[data-buildfold="1"][data-buildview="float"] .preview-pane{height:auto !important}
+body[data-buildfold="1"] #previewPane .pv-frame-wrap, body[data-buildfold="1"] #previewPane .console,
+body[data-buildfold="1"] #previewPane .stage-foot{display:none !important}
+body[data-buildfold="1"] #previewPane{flex:0 0 auto; min-height:0}
+body[data-buildfold="1"][data-buildview="float"] #previewPane{height:auto !important}
 /* the code rests, the stage takes the card */
 body[data-builded="hidden"] .editor-pane, body[data-builded="hidden"] .build-handle{display:none}
 body[data-builded="hidden"] #showEditor{display:inline-flex}
 body[data-builded="hidden"] #hideEditor{display:none}
 /* closed: the stage rests, the code takes the card */
-body[data-buildview="closed"] .preview-pane, body[data-buildview="closed"] .build-handle{display:none}
+body[data-buildview="closed"] #previewPane, body[data-buildview="closed"] .build-handle{display:none}
 body[data-buildview="closed"] .build-grid{min-height:0}
 body[data-buildview="closed"] .editor-pane{flex:1 1 auto; max-width:none}
 body[data-buildview="closed"] #showPreview{display:inline-flex}
 /* float: a window, dragged by its bar, resized by eight grips */
-body[data-buildview="float"] .preview-pane{position:fixed; z-index:520;
+body[data-buildview="float"] #previewPane{position:fixed; z-index:520;
   left:var(--pv-x,60px); top:var(--pv-y,80px); width:var(--pv-w,640px); height:var(--pv-h,520px);
   min-width:320px; min-height:240px; box-sizing:border-box;
   background:var(--card); border:1px solid var(--hairline); border-radius:14px; padding:10px 12px 12px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(20,10,36,.22), 0 26px 56px rgba(20,10,36,.28)}
 body[data-buildview="float"] .build-handle{display:none}
 body[data-buildview="float"] .editor-pane{flex:1 1 auto; max-width:none}
-body[data-buildview="float"] .stagebar{cursor:grab; user-select:none}
-body[data-buildview="float"] .stagebar:active{cursor:grabbing}
+body[data-buildview="float"] #previewBar{cursor:grab; user-select:none}
+body[data-buildview="float"] #previewBar:active{cursor:grabbing}
 body[data-buildview="float"] #hideEditor, body[data-buildview="float"] #showEditor,
 body[data-buildview="float"] #closePreview{display:none}
 .fgrip{display:block; position:absolute; z-index:6}
-body[data-buildview="closed"] .fgrip{display:none}
+body[data-buildview="closed"] #previewPane .fgrip{display:none}
 .fgrip-n{top:-5px; left:14px; right:14px; height:12px; cursor:ns-resize}
 .fgrip-s{bottom:-5px; left:14px; right:14px; height:12px; cursor:ns-resize}
 .fgrip-e{right:-5px; top:14px; bottom:14px; width:12px; cursor:ew-resize}
@@ -735,7 +735,7 @@ body[data-buildview="closed"] .fgrip{display:none}
 .fgrip-ne::after, .fgrip-nw::after{
   content:none}
 /* full: the preview fills the screen, the card waits beneath */
-body[data-buildview="full"] .preview-pane{position:fixed; top:8px;right:8px;bottom:8px;left:8px; z-index:520; height:auto !important;
+body[data-buildview="full"] #previewPane{position:fixed; top:8px;right:8px;bottom:8px;left:8px; z-index:520; height:auto !important;
   background:var(--card); border:1px solid var(--hairline); border-radius:14px; padding:10px 12px 12px; box-sizing:border-box;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(20,10,36,.22), 0 26px 56px rgba(20,10,36,.28)}
 body[data-buildview="full"] .editor-pane, body[data-buildview="full"] .build-handle{display:none}
@@ -759,7 +759,7 @@ body[data-buildview="full"] .editor-pane{flex:1 1 auto; max-width:none}
 #codeEditor{flex:1; min-height:0; border:none; background:transparent; font-family:var(--mono); font-size:12.5px; line-height:1.55; color:var(--ink-1); padding:11px; resize:none}
 .pv-dragveil{position:absolute; top:0;right:0;bottom:0;left:0; z-index:44; background:transparent; cursor:inherit}
 body[data-dragging]{user-select:none; -webkit-user-select:none}
-.build-handle, .fgrip, body[data-buildview="float"] .stagebar{touch-action:none}
+.build-handle, .cs-handle, .fgrip, body[data-buildview="float"] #previewBar, body[data-csview="float"] #csBar{touch-action:none}
 /* frame height comes from .pv-frame-wrap */
 .console{height:110px; overflow:auto; background:var(--card-lo); border-top:1px solid var(--hairline); font-family:var(--mono); font-size:11.5px; padding:7px 11px; color:var(--ink-2)}
 .console .cerr{color:var(--bad)} .console .cwarn{color:var(--warn)}
@@ -1633,7 +1633,7 @@ body[data-nav="top"] .dock{top:calc(42px + var(--sat))}
 #schedaePanel{right:calc(16px + var(--sar)); bottom:calc(72px + var(--sab))}
 #focusExit{left:calc(14px + var(--sal)); bottom:calc(16px + var(--sab))}
 .chat-drawer-body{padding-bottom:calc(22px + var(--sab))}
-body[data-buildview="full"] .preview-pane{top:calc(8px + var(--sat)); right:calc(8px + var(--sar)); bottom:calc(8px + var(--sab)); left:calc(8px + var(--sal))}
+body[data-buildview="full"] #previewPane{top:calc(8px + var(--sat)); right:calc(8px + var(--sar)); bottom:calc(8px + var(--sab)); left:calc(8px + var(--sal))}
 .foot{padding-bottom:calc(26px + var(--sab)); padding-left:calc(16px + var(--sal)); padding-right:calc(16px + var(--sar))}
 /* the bar: the name gives way (it shortens) before it can run into the keys */
 button.brand{flex:0 1 auto; overflow:hidden}
@@ -1876,6 +1876,144 @@ body:not([data-motion="minimal"]) .calm-writing .cw-dot{animation:cwPulse 2.4s e
 @keyframes cwPulse{0%,100%{opacity:.25}50%{opacity:1}}
 /* read aloud, copy */
 .msg-acts{display:flex; gap:6px; margin-top:8px; white-space:normal}
+/* ============ R82: the chat's stage, beside the conversation ============
+   The Forge's preview as its 628 build draws it: one row (Preview or Code,
+   the name, the zoom, Full, and a More of its own), one quiet line under it,
+   the page, and Copy, Open and Download beneath; on the right of the chat as
+   Claude shows an artifact. The line between them drags. */
+.cs-handle, .cs-pane{display:none}
+body.cs-on #page-chat .chat-col{max-width:none; display:flex; align-items:stretch}
+body.cs-on #page-chat .chat-card{flex:0 0 var(--cs-chat-w,44%); min-width:300px; max-width:calc(100% - 352px); box-sizing:border-box}
+body.cs-on #page-chat .chat-wrap{height:max(460px, calc(100vh - 250px))}
+body.cs-on .cs-handle{display:block; width:12px; flex:0 0 12px; cursor:col-resize; position:relative; align-self:stretch}
+.cs-handle::after{content:""; position:absolute; top:50%; left:4px; width:4px; height:56px; margin-top:-28px;
+  border-radius:3px; background:rgba(106,63,181,.28); transition:background .15s ease}
+.cs-handle:hover::after, .cs-handle:focus-visible::after{background:var(--accent)}
+.cs-handle:focus-visible{outline:none}
+body.cs-on .cs-pane{display:flex; flex:1 1 auto; min-width:340px; padding:10px 12px 10px; box-sizing:border-box; position:relative}
+/* the row */
+.cs-bar{flex-wrap:nowrap !important; gap:6px; padding:0 0 8px}
+.cs-bar > *{flex:0 0 auto}
+.cs-bar .cs-name{flex:1 1 auto; min-width:0; text-align:left; padding:0 4px}
+.cs-key{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px; box-sizing:border-box;
+  border:1px solid var(--hairline); border-radius:999px; background:var(--card); color:var(--ink-2);
+  font:600 11.5px/1 var(--sans); cursor:pointer; white-space:nowrap; transition:background .12s ease, color .12s ease}
+.cs-key:hover{background:var(--accent-softer); color:var(--accent)}
+.cs-key[aria-pressed="true"], .cs-key[aria-expanded="true"]{background:var(--accent-soft); color:var(--accent-deep); box-shadow:inset 0 2px 5px rgba(40,20,70,.16)}
+body[data-theme="night"] .cs-key[aria-pressed="true"], body[data-theme="night"] .cs-key[aria-expanded="true"]{color:var(--accent-bright)}
+.cs-key:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.cs-chev{font-size:10px; opacity:.7; transition:transform .16s ease}
+.cs-key[aria-expanded="true"] .cs-chev{transform:rotate(180deg)}
+#csShowChat{display:none}
+body[data-cschat="hidden"] #csShowChat{display:inline-flex}
+.cs-more-wrap{position:relative; display:inline-flex}
+.cs-menu{min-width:250px; z-index:640}
+.cs-menu .menu-btn{display:flex; align-items:center; gap:8px}
+.cs-menu .menu-btn[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent-deep); font-weight:700}
+.cs-menu .ctx-hint{margin-left:auto; font-size:10.5px; color:var(--ink-3); font-weight:400}
+/* a narrower stage: first the zoom keys shorten, then the name gives way */
+.cs-bar[data-w~="n1"] #csZoomOut, .cs-bar[data-w~="n1"] #csZoomIn{font-size:0; width:28px; padding:0; justify-content:center}
+.cs-bar[data-w~="n1"] #csZoomOut::before{content:"\2212"; font:700 14px/1 var(--sans)}
+.cs-bar[data-w~="n1"] #csZoomIn::before{content:"+"; font:700 14px/1 var(--sans)}
+.cs-bar[data-w~="n2"] .cs-name{visibility:hidden; flex-basis:0}
+.cs-bar[data-w~="n3"] .stage-zoom{display:none}
+/* the quiet line under the row */
+.cs-line{margin:-2px 2px 8px; font:italic 12.5px/1.45 Georgia, "Times New Roman", serif; color:var(--accent-deep)}
+body[data-theme="night"] .cs-line{color:var(--accent-bright)}
+.cs-line[hidden]{display:none}
+.cs-line-x{border:0; background:transparent; color:var(--ink-3); cursor:pointer; font-size:12px; padding:0 4px}
+.cs-line-x:hover{color:var(--accent)}
+/* the page, its code, its changes */
+.cs-pane .pv-frame-wrap{min-height:200px}
+#csFrame{flex:1; width:100%; height:100%; border:0; display:block; background:transparent}
+.cs-code, .cs-changes{position:absolute; top:0;right:0;bottom:0;left:0; margin:0; padding:14px; overflow:auto; background:var(--card); color:var(--ink-1)}
+.cs-code{font:12.5px/1.6 var(--mono); white-space:pre-wrap; overflow-wrap:anywhere}
+.cs-code[hidden], .cs-changes[hidden]{display:none}
+.cs-code .cs-code-note, .cs-changes .cs-ch-head{display:block; margin:0 0 10px; padding:6px 10px; border-radius:8px; background:var(--accent-softer); color:var(--ink-2); font:600 11.5px/1.45 var(--sans); white-space:normal}
+.cs-changes{font:12px/1.55 var(--mono)}
+.cs-ch-row{white-space:pre-wrap; overflow-wrap:anywhere; padding:0 8px 0 26px; position:relative; border-radius:4px}
+.cs-ch-row::before{position:absolute; left:8px; top:0; font-weight:700}
+.cs-ch-row.add{background:rgba(46,140,87,.12)} .cs-ch-row.add::before{content:"+"; color:#2e8c57}
+.cs-ch-row.del{background:rgba(184,67,63,.10); text-decoration:line-through; text-decoration-color:rgba(184,67,63,.5); color:var(--ink-2)} .cs-ch-row.del::before{content:"−"; color:#b8433f}
+.cs-ch-row.ctx{color:var(--ink-3)}
+.cs-ch-gap{color:var(--ink-3); font:italic 11.5px/1.6 var(--sans); padding:4px 8px}
+body[data-theme="night"] .cs-ch-row.add{background:rgba(70,180,120,.16)}
+body[data-theme="night"] .cs-ch-row.del{background:rgba(220,90,90,.16)}
+.cs-empty{position:absolute; top:0;right:0;bottom:0;left:0; display:grid; place-items:center; text-align:center; padding:30px;
+  pointer-events:none; font:14px/1.6 var(--sans); color:var(--ink-3)}
+.pv-frame-wrap[data-lived="1"] .cs-empty{display:none}
+.cs-zoomfit{font-family:var(--mono); min-width:46px}
+.cs-pane .console{display:none}
+body.cs-on .cs-pane[data-mode="preview"] .console.has{display:block}
+body[data-csdim="1"] #csFrameWrap::after{background:rgba(20,22,26,.14)}
+body[data-theme="night"][data-csdim="1"] #csFrameWrap::after{background:rgba(8,9,12,.34)}
+body[data-theme="night"] #csFrame{background:#000 !important}
+/* the chat rests, the stage takes the width */
+body.cs-on[data-cschat="hidden"] #page-chat .chat-card, body.cs-on[data-cschat="hidden"] .cs-handle{display:none}
+/* rolled up: the row alone */
+body[data-csfold="1"] #csPane .pv-frame-wrap, body[data-csfold="1"] #csPane .console, body[data-csfold="1"] #csPane .stage-foot, body[data-csfold="1"] #csLine{display:none !important}
+body.cs-on[data-csfold="1"] #csPane{align-self:flex-start}
+/* float: a window, dragged by its row, resized by eight grips */
+body.cs-on[data-csview="float"] #page-chat .chat-card{flex:1 1 auto; max-width:none}
+body.cs-on[data-csview="float"] .cs-handle{display:none}
+body.cs-on[data-csview="float"] #csPane{position:fixed; z-index:520;
+  left:var(--cs-x,60px); top:var(--cs-y,80px); width:var(--cs-w,640px); height:var(--cs-h,520px);
+  min-width:320px; min-height:240px; padding:10px 12px 12px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(20,10,36,.22), 0 26px 56px rgba(20,10,36,.28)}
+body.cs-on[data-csview="float"][data-csfold="1"] #csPane{height:auto}
+body[data-csview="float"] #csBar{cursor:grab; user-select:none}
+body[data-csview="float"] #csBar:active{cursor:grabbing}
+body[data-csview="float"] #csHideChat, body[data-csview="float"] #csShowChat, body[data-csview="float"] #csClose{display:none !important}
+/* full: the preview fills the screen, the chat waits beneath */
+body.cs-on[data-csview="full"] #csPane{position:fixed; top:calc(8px + var(--sat,0px)); right:calc(8px + var(--sar,0px)); bottom:calc(8px + var(--sab,0px)); left:calc(8px + var(--sal,0px)); z-index:520;
+  padding:10px 12px 12px; box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 8px 20px rgba(20,10,36,.22), 0 26px 56px rgba(20,10,36,.28)}
+body.cs-on[data-csview="full"] #page-chat .chat-card{flex:1 1 auto; max-width:none}
+body.cs-on[data-csview="full"] .cs-handle{display:none}
+body.cs-on[data-csview="full"] #csHideChat{display:none}
+body.cs-on.chat-drawer-on #page-chat .chat-card{min-width:280px}
+/* narrow windows: the stage opens over the chat, whole */
+@media (max-width:920px){
+  body.cs-on #page-chat .chat-col{display:block}
+  body.cs-on #page-chat .chat-card{max-width:none}
+  body.cs-on .cs-handle{display:none !important}
+  body.cs-on #csPane{position:fixed; top:calc(8px + var(--sat,0px)); right:calc(8px + var(--sar,0px)); bottom:calc(8px + var(--sab,0px)); left:calc(8px + var(--sal,0px)); z-index:520; min-width:0}
+  #csHideChat, #csShowChat, #csFloat, #csFull{display:none !important}
+}
+/* a page a reply carries, as a card in the reply; an app sent as a file, as a key */
+.cs-card{display:flex; align-items:center; gap:11px; width:100%; max-width:430px; margin:10px 0 2px; padding:9px 12px; text-align:left;
+  border:1px solid rgba(106,63,181,.35); border-radius:12px; background:linear-gradient(180deg,var(--card-hi),var(--card-lo));
+  color:var(--ink-1); cursor:pointer; box-shadow:var(--pop); white-space:normal; font:inherit;
+  transition:transform .16s cubic-bezier(.34,1.3,.64,1), box-shadow .16s ease}
+.cs-card:hover{transform:translateY(-2px); box-shadow:var(--pop-hi)}
+.cs-card:active{transform:translateY(1px)}
+.cs-card-ico{flex:0 0 auto; width:34px; height:34px; display:grid; place-items:center; border-radius:9px; background:var(--accent-soft); color:var(--accent-deep); font-size:17px}
+.cs-card-tx{display:flex; flex-direction:column; min-width:0}
+.cs-card-name{font:700 13px/1.3 var(--sans); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cs-card-sub{font:12px/1.35 var(--sans); color:var(--ink-3)}
+.cs-card.live .cs-card-ico{animation:csPulse 1.4s ease-in-out infinite}
+@keyframes csPulse{50%{opacity:.45}}
+body[data-motion="minimal"] .cs-card.live .cs-card-ico{animation:none}
+@media (prefers-reduced-motion: reduce){.cs-card.live .cs-card-ico{animation:none}.cs-card, .cs-key{transition:none}}
+body[data-theme="night"] .cs-card{background:linear-gradient(180deg,rgba(43,35,53,.9),rgba(28,22,36,.9)); border-color:rgba(183,156,230,.4)}
+body[data-theme="night"] .cs-card-ico{color:var(--accent-bright)}
+button.msg-file{border:1px solid currentColor; border-radius:999px; background:transparent; color:inherit; font:inherit; cursor:pointer; padding:1px 9px}
+button.msg-file:hover{background:var(--accent-softer)}
+.cchip.pv{cursor:pointer}
+.cs-key .nm{font-weight:600}
+#csShow[hidden]{display:none !important}
+/* a narrow chat beside the stage: its top keys keep their marks and drop their words */
+.chat-card.cc-tight #chatNew .nm, .chat-card.cc-tight #chatCtlBtn .nm, .chat-card.cc-tight #csShow .nm{display:none}
+.chat-card.cc-tight .chat-top{flex-wrap:nowrap}
+.chat-card.cc-tight #chatConvBtn{min-width:0; flex:0 1 auto}
+
+/* R81: a very long message, folded */
+.msg-long-body{white-space:pre-wrap; overflow-wrap:anywhere}
+.msg-long-body.open{max-height:min(52vh,460px); overflow:auto; overscroll-behavior:contain; padding-right:4px}
+.msg-long-btn{margin-top:8px}
+/* R83: your own message's keys, at its right */
+.msg.me .me-acts{justify-content:flex-end}
+.msg.me .msg-act{color:var(--ink-2)}
+.msg.me .msg-long-btn{color:inherit}
 .msg-act{border:1px solid var(--hairline); background:transparent; color:var(--ink-3); border-radius:999px; padding:3px 11px; font:600 12px/1.4 var(--sans); cursor:pointer}
 .msg-act:hover{color:var(--ink-1); border-color:rgba(var(--accent-line-rgb),.45)}
 /* the time in the top bar */
@@ -2703,7 +2841,7 @@ body[data-motion="minimal"] .pres-menu{animation:none}
     </div>
   </aside>
   <div class="chat-drawer-scrim" id="chatDrawerScrim" hidden></div>
-      <div class="chat-col">
+      <div class="chat-col" id="chatCol">
         <div class="card chat-card">
           <div class="chat-top">
             <button type="button" class="chat-top-key" id="chatConvBtn" aria-haspopup="true" aria-expanded="false" title="Your conversations">
@@ -2711,7 +2849,8 @@ body[data-motion="minimal"] .pres-menu{animation:none}
               <span class="chev">▾</span>
             </button>
             <span style="flex:1"></span>
-            <button type="button" class="btn small primary" id="chatNew">+ New conversation</button>
+            <button type="button" class="btn small primary" id="chatNew" title="Start a new conversation">+<span class="nm"> New conversation</span></button>
+            <button type="button" class="chat-top-key cs-key" id="csShow" title="Show the preview beside the chat" hidden><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M13 4v16"/></svg><span class="nm">Preview</span></button>
             <button type="button" class="chat-top-key ctl-key" id="chatCtlBtn" aria-controls="chatDrawer" aria-expanded="false" title="Controls: engine, system prompt, effort"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="nm">Controls</span></button>
             <button type="button" class="chat-top-key sq" id="chatMoreBtn" aria-haspopup="true" aria-expanded="false" title="More for this conversation">⋯</button>
             <div class="chat-menu" id="chatConvMenu" hidden></div>
@@ -2725,19 +2864,6 @@ body[data-motion="minimal"] .pres-menu{animation:none}
           </div>
           <div class="chat-wrap">
             <div class="chat-scroll" id="chatScroll"></div>
-            <div class="chat-preview" id="chatPreview" hidden>
-              <div class="stagebar">
-                <span style="font-size:12px; font-weight:700; color:var(--ink-2)">Live preview</span>
-                <span class="stage-name">from the reply above</span>
-                <span class="seg" role="group" aria-label="The chat preview">
-                  <button class="seg-btn" id="cpCopy" title="Copy the source">Copy</button>
-                  <button class="seg-btn" id="cpOpen" title="Open in a new window or tab">Open</button>
-                  <button class="seg-btn" id="cpDl" title="Download as HTML">Download</button>
-                  <button class="seg-btn" id="cpClose" title="Close the preview">✕</button>
-                </span>
-              </div>
-              <iframe id="chatPreviewFrame" sandbox="allow-scripts allow-modals" title="Live preview from chat" style="flex:1; border:none; background:#fff"></iframe>
-            </div>
             <div class="chat-img-chip" id="chatImgChip"><img alt="" id="chatImgThumb"><span id="chatImgName"></span><button class="cx" id="chatImgX" title="Remove this picture">✕</button></div>
             <div class="composer">
               <div class="chat-chips" id="chatChips"></div>
@@ -2761,6 +2887,39 @@ body[data-motion="minimal"] .pres-menu{animation:none}
             </div>
           </div>
 
+        </div>
+        <!-- R82: the chat's stage: the Forge's preview (its 628 row), beside the conversation -->
+        <div class="cs-handle" id="csHandle" role="separator" aria-orientation="vertical" aria-label="Resize the chat and the preview" tabindex="0" title="Drag to resize the chat and the preview (or use the arrow keys)"></div>
+        <div class="card preview-pane cs-pane" id="csPane" aria-label="Live preview">
+          <div class="stagebar cs-bar" id="csBar">
+            <button class="cs-key" id="csShowChat" title="Show the chat again">› Show</button>
+            <span class="seg" role="group" aria-label="View"><button class="seg-btn active" id="csViewPrev" aria-pressed="true">👁️ Preview</button><button class="seg-btn" id="csViewCode" aria-pressed="false">🧾 Code</button></span>
+            <span class="stage-name cs-name" id="csName">nothing yet</span>
+            <span class="seg stage-zoom" role="group" aria-label="Zoom the preview"><button class="seg-btn" id="csZoomOut" title="Smaller: see more of the page">🔍➖</button><button class="seg-btn cs-zoomfit" id="csZoomFit" title="Fit the whole page, or back to full size">100%</button><button class="seg-btn" id="csZoomIn" title="Larger: see it closer">🔍➕</button></span>
+            <button class="cs-key" id="csFull" aria-pressed="false" title="Fill the whole screen with the preview">⛶ Full</button>
+            <span class="cs-more-wrap"><button class="cs-key" id="csMore" aria-haspopup="true" aria-expanded="false" title="More for the preview: changes, roll up, float, dim, hide the chat, edit, close">More <span class="cs-chev">▾</span></button>
+              <div class="chat-menu right cs-menu" id="csMenu" role="menu" hidden>
+                <button type="button" class="menu-btn" id="csChanges" role="menuitem" aria-pressed="false">🔍 Changes <span class="ctx-hint">what this version changed</span></button>
+                <button type="button" class="menu-btn" id="csFold" role="menuitem" aria-pressed="false">🔽 Roll the preview up</button>
+                <button type="button" class="menu-btn" id="csFloat" role="menuitem" aria-pressed="false" title="Float the preview as a window you can drag by its bar and resize from any edge or corner">🪟 Float</button>
+                <button type="button" class="menu-btn" id="csDim" role="menuitem" aria-pressed="false" title="Dim the preview for night work">🌙 Dim</button>
+                <button type="button" class="menu-btn" id="csHideChat" role="menuitem" title="Hide the chat and give the preview the width">‹ Hide the chat</button>
+                <button type="button" class="menu-btn" id="csEdit" role="menuitem" title="Open this page in the Build editor, to change it by hand">✎ Edit in Build</button>
+                <div class="ctx-sep"></div>
+                <button type="button" class="menu-btn" id="csClose" role="menuitem" title="Close the preview; the chat takes the width">✕ Close</button>
+              </div></span>
+          </div>
+          <div class="cs-line" id="csLine" role="note" hidden><span id="csLineText"></span> <button type="button" class="cs-line-x" id="csLineX" aria-label="Close this line" title="Close this line">✕</button></div>
+          <div class="pv-frame-wrap" id="csFrameWrap">
+            <iframe id="csFrame" sandbox="allow-scripts allow-modals allow-forms allow-popups" allow="clipboard-read *; clipboard-write *; microphone *; fullscreen *" title="Live preview"></iframe>
+            <div class="cs-empty" id="csEmpty">The preview lives here.<br>A page a model writes in this chat, or an app you send as a file, opens here beside the conversation.</div>
+            <pre class="cs-code" id="csCode" hidden></pre>
+            <div class="cs-changes" id="csChangesView" hidden></div>
+          </div>
+          <div class="console" id="csConsole"></div>
+          <div class="stage-foot" id="csFoot"><span class="cluster"><button class="cl" id="csCopy" title="Copy the page source">Copy</button><button class="cl" id="csOpen" title="Open the page in a new window or tab">Open</button><button class="cl" id="csDl" title="Download the page">Download</button></span></div>
+          <div class="fgrip fgrip-n"></div><div class="fgrip fgrip-s"></div><div class="fgrip fgrip-e"></div><div class="fgrip fgrip-w"></div>
+          <div class="fgrip fgrip-ne"></div><div class="fgrip fgrip-nw"></div><div class="fgrip fgrip-se"></div><div class="fgrip fgrip-sw"></div>
         </div>
       </div>
     </section>
@@ -3482,11 +3641,18 @@ function loadState(){
     try{localStorage.setItem(KEY+".broken-"+Date.now(),localStorage.getItem(KEY)||"");
         localStorage.removeItem(KEY);}catch(_){}
     return null;}}
+/* R81: what the desk keeps of each thing: never a file handle, and never a
+   file's fitted overview (it is worked out again, the same, when needed) */
+function deskReplacer(k,v){return (k==="_handle"||k==="attachFit"||k==="attachFitFor")?undefined:v;}
 function saveState(){try{
   state.__deskAt=Date.now();
-  var raw=JSON.stringify(state,function(k,v){return k==="_handle"?undefined:v;});
-  if(HAS_LS)localStorage.setItem(KEY,raw);else memStore[KEY]=raw;
-  ingNoteSnapshot(raw);
+  var raw=JSON.stringify(state,deskReplacer);
+  /* R81: a refusal from this view's store (it holds about 5 MB) no longer
+     stops the save. The recovery shelf gives up its room first, and the copy
+     on disk below is written whatever this store says. */
+  if(HAS_LS){try{localStorage.setItem(KEY,raw);ingNoteSnapshot(raw);}
+    catch(e1){try{SNAPRING.forEach(function(k){localStorage.removeItem(k);});localStorage.setItem(KEY,raw);}catch(e2){ingStoreFull();}}}
+  else memStore[KEY]=raw;
   /* R61: written through to the shell's own disk copy of the desk, so a web
      view whose storage forgets (ephemeral profile, a changed address) can
      never be the only place the desk exists. A plain trailing debounce: half
@@ -3496,7 +3662,7 @@ function saveState(){try{
     var q=saveState._q||(saveState._q={timer:null});
     if(q.timer)clearTimeout(q.timer);
     q.timer=setTimeout(function(){q.timer=null;
-      try{var raw2=JSON.stringify(state,function(k2,v2){return k2==="_handle"?undefined:v2;});
+      try{var raw2=JSON.stringify(state,deskReplacer);
         var api2=(typeof shellApi==="function")?shellApi():null;
         if(api2)api2.save_state(raw2);}catch(e){}},500);}
 }catch(e){}}
@@ -3505,7 +3671,7 @@ function saveState(){try{
    does not leave the disk copy one step behind the desk on screen. */
 function flushShellSave(){var q=saveState._q;if(!q||!q.timer)return;clearTimeout(q.timer);q.timer=null;
   try{var api=(typeof shellApi==="function")?shellApi():null;
-    if(api&&typeof api.save_state==="function")api.save_state(JSON.stringify(state,function(k,v){return k==="_handle"?undefined:v;}));}catch(e){}}
+    if(api&&typeof api.save_state==="function")api.save_state(JSON.stringify(state,deskReplacer));}catch(e){}}
 window.addEventListener("pagehide",flushShellSave);
 document.addEventListener("visibilitychange",function(){if(document.hidden)flushShellSave();});
 /* R50: the recovery shelf. Three earlier moments of your whole studio (notes,
@@ -3513,7 +3679,7 @@ document.addEventListener("visibilitychange",function(){if(document.hidden)flush
    at most every three quarters of a minute, so a crash or a bad edit never
    costs more than that. Recover one from Settings, Data on this device. */
 var SNAPRING=[KEY+".snap0",KEY+".snap1",KEY+".snap2"],_snapAt=0;
-function ingNoteSnapshot(raw){var now=Date.now();if(now-_snapAt<45000)return;_snapAt=now;
+function ingNoteSnapshot(raw){var now=Date.now();if(now-_snapAt<45000||raw.length>1000000)return;_snapAt=now;
   try{if(!HAS_LS)return;
     var s1=localStorage.getItem(SNAPRING[0]);
     if(s1){var s2=localStorage.getItem(SNAPRING[1]);
@@ -3524,6 +3690,80 @@ function ingSnapshots(){var out=[];
   SNAPRING.forEach(function(k){try{var r=localStorage.getItem(k);if(!r)return;
     var p=JSON.parse(r);if(p&&p.v)out.push({key:k,at:p.at||0,size:p.v.length,raw:p.v});}catch(e){}});
   out.sort(function(a,b){return b.at-a.at;});return out;}
+
+/* ============ R81: big texts live apart from the desk ============
+   A whole app pasted or attached (several megabytes) used to ride inside the
+   desk itself, which is written out on every change. The browser's store
+   (about 5 MB) then refused the desk, and with it every later save, and each
+   redraw of the chat laid out megabytes of text. Now any text longer than
+   BIG_AT is kept in its own store (this device's IndexedDB, and in the
+   computer apps a folder beside the desk as well), and the desk keeps only a
+   short reference to it. */
+var BIG_AT=64*1024,BIG_PASTE=12000,MSG_BIG=30000,MSG_FOLD=6000;
+var IngBig=(function(){var mem={},dbp=null;
+  function db(){if(dbp)return dbp;
+    dbp=new Promise(function(res,rej){try{var rq=indexedDB.open("ingenium_big",1);
+      rq.onupgradeneeded=function(){try{rq.result.createObjectStore("t");}catch(e){}};
+      rq.onsuccess=function(){res(rq.result);};rq.onerror=function(){rej(rq.error);};}catch(e){rej(e);}});
+    dbp.catch(function(){});return dbp;}
+  function tx(mode,fn){return db().then(function(d){return new Promise(function(res,rej){var t=d.transaction("t",mode),r=fn(t.objectStore("t"));
+      t.oncomplete=function(){res(r?r.result:undefined);};t.onerror=function(){rej(t.error);};t.onabort=function(){rej(t.error);};});});}
+  function shell(){var a=(typeof shellApi==="function")?shellApi():null;return a&&typeof a.big_put==="function"?a:null;}
+  function has(id){return Object.prototype.hasOwnProperty.call(mem,id);}
+  function put(id,text){text=String(text==null?"":text);mem[id]=text;
+    var p1=tx("readwrite",function(s){return s.put(text,id);}).catch(function(){});
+    var a=shell(),p2=(a&&text.length<=16*1024*1024)?Promise.resolve().then(function(){return a.big_put(id,text);}).catch(function(){}):Promise.resolve();
+    return Promise.all([p1,p2]).then(function(){return id;});}
+  function get(id){return id&&has(id)?mem[id]:null;}
+  function load(id){if(!id)return Promise.resolve(null);if(has(id))return Promise.resolve(mem[id]);
+    return tx("readonly",function(s){return s.get(id);}).catch(function(){return null;}).then(function(t){
+      if(typeof t==="string"){mem[id]=t;return t;}
+      var a=shell();if(!a||typeof a.big_get!=="function")return null;
+      return Promise.resolve().then(function(){return a.big_get(id);}).then(function(r){
+        if(r&&r.ok&&typeof r.text==="string"){mem[id]=r.text;tx("readwrite",function(s){return s.put(r.text,id);}).catch(function(){});return r.text;}
+        return null;},function(){return null;});});}
+  function del(id){if(!id)return;delete mem[id];tx("readwrite",function(s){return s.delete(id);}).catch(function(){});
+    var a=shell();if(a&&typeof a.big_del==="function"){try{Promise.resolve(a.big_del(id)).catch(function(){});}catch(e){}}}
+  function newId(){return "big_"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+  /* what nothing on the desk names any more is let go, ten minutes after it was made at the earliest */
+  function gc(live){var now=Date.now(),old=function(id){var ts=parseInt(String(id).slice(4,-6),36);return !(ts>0)||now-ts>600000;};
+    return tx("readonly",function(s){return s.getAllKeys?s.getAllKeys():null;}).then(function(keys){
+      (keys||[]).forEach(function(k){if(!live[k]&&old(k))del(k);});}).catch(function(){}).then(function(){
+      var a=shell();if(a&&typeof a.big_gc==="function"){try{Promise.resolve(a.big_gc(Object.keys(live))).catch(function(){});}catch(e){}}});}
+  return {put:put,get:get,load:load,del:del,newId:newId,gc:gc};})();
+/* every big text the desk names: a message's files, a page kept for the preview, an app on the shelf */
+function ingBigLive(){var live={},raw="";try{raw=JSON.stringify(state);}catch(e){}
+  var re=/"(big_[a-z0-9]{7,})"/g,m;while((m=re.exec(raw)))live[m[1]]=1;
+  try{(stagedFiles||[]).forEach(function(f){if(f.ref)live[f.ref]=1;if(f.page)live[f.page]=1;});}catch(e){}
+  return live;}
+/* a message's files, as the model reads them */
+function msgAttach(x){if(!x)return "";if(typeof x.attach==="string")return x.attach;return x.attachRef?(IngBig.get(x.attachRef)||""):"";}
+/* before a model reads the conversation, every file it names is brought back from the store */
+function ingBigEnsureChat(){var ids=[];try{curMsgs().forEach(function(x){if(x.attachRef&&IngBig.get(x.attachRef)===null)ids.push(x.attachRef);});}catch(e){}
+  return Promise.all(ids.map(function(id){return IngBig.load(id).catch(function(){return null;});})).then(function(){},function(){});}
+/* a name for pasted text, from what it looks like */
+function pasteName(t,i){var s=String(t||"").slice(0,4000),kind="text",ext="txt";
+  if(/^\s*(<!doctype html|<html[\s>])/i.test(s)||/<(head|body|script|style|div|section)[\s>]/i.test(s)){kind="page";ext="html";}
+  else if(/^\s*(def |class \w+[:(]|import \w|from [\w.]+ import)/m.test(s)){kind="code";ext="py";}
+  else if(/\b(function\s*\w*\s*\(|const |let |var |=>|import |export )/.test(s)){kind="code";ext="js";}
+  return "pasted-"+kind+(i?"-"+(i+1):"")+"."+ext;}
+/* R81: the desk as it was kept before this build carried big texts inside it; they move to the store once */
+function ingBigMigrate(st){var moved=0;
+  (st&&st.chats||[]).forEach(function(c){(c.messages||[]).forEach(function(x){
+    delete x.attachFit;delete x.attachFitFor;
+    if(x.role!=="me")return;
+    var blk=typeof x.attach==="string"?x.attach:"";
+    if(typeof x.text==="string"&&x.text.length>MSG_BIG){var nm=pasteName(x.text,0);
+      blk=(blk?blk+"\n\n":"")+"<file name=\""+nm+"\">\n"+x.text+"\n</file>";
+      x.files=(x.files||[]).concat([{name:nm,chars:x.text.length,pasted:1}]);x.text="";moved++;}
+    if(blk.length>BIG_AT&&!x.attachRef){x.attachRef=IngBig.newId();x.attachChars=blk.length;IngBig.put(x.attachRef,blk);delete x.attach;moved++;}
+    else if(blk&&blk!==x.attach)x.attach=blk;});});
+  return moved;}
+var _storeFullSaid=false;
+function ingStoreFull(){if(_storeFullSaid)return;_storeFullSaid=true;
+  var api=(typeof shellApi==="function")?shellApi():null,onDisk=!!(api&&typeof api.save_state==="function");
+  setTimeout(function(){try{ingToast(onDisk?"This window's own store is full, so your desk is kept in the app's copy on disk. Nothing is lost."
+    :"This browser's store for Ingenium is full, so your newest changes may not be kept after a reload. Deleting a long conversation frees room; the Mac, Windows, Fire and iPhone apps keep a copy on disk as well.");}catch(e){}},0);}
 
 var DEFAULTS={
   appName:"Ingenium", theme:"day", motion:"calm", depth:"raised", nav:"side", frame:"off", activeModelId:null,
@@ -3603,9 +3843,11 @@ function migrateFrom(old){
   delete merged.chat;
   if(!Array.isArray(merged.chats))merged.chats=[];
   if(typeof merged.activeChat!=="string")merged.activeChat=null;
+  try{ingBigMigrate(merged);}catch(e){}
   return merged;
 }
 state=migrateFrom(loadState());
+setTimeout(function(){try{IngBig.gc(ingBigLive());}catch(e){}},90000);
 try{if(HAS_LS&&localStorage.getItem("ingenium_intro_seen")==="1")state.introSeen=true;}catch(e){}
 
 /* R61: the desk also lives on disk, kept by the shell. If this view booted
@@ -5936,20 +6178,67 @@ function readAsText(f){if(fileIsDocx(f))return docxText(f);if(fileIsPdf(f))retur
 function ingNote(t){var c=$("chatChips");ingToast(t);}
 function ingToast(t){var n=$("ingToast");if(!n){n=el("div");n.id="ingToast";n.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:900;max-width:min(560px,calc(100vw - 32px));padding:9px 14px;border-radius:11px;background:var(--card-hi);border:1px solid var(--hairline);box-shadow:0 10px 30px rgba(40,20,70,.22);font:600 12.5px/1.45 var(--sans);color:var(--ink-1)";document.body.appendChild(n);}
   n.textContent=t;n.style.display="block";clearTimeout(ingToast._t);ingToast._t=setTimeout(function(){n.style.display="none";},6500);}
+/* R81: files of any ordinary size are read. A single-file app of 20 MB or
+   more is mostly its embedded pictures, fonts and sounds: the model is given
+   the app's code with those left out (each named, with its size), and the
+   page itself is kept whole, for the preview. The text a model is given from
+   one file is cut only past four million characters. */
+var CHAT_FILE_MAX_CHARS=4000000,CHAT_FILE_MAX_MB=120;
+function mediaKind(mime){mime=String(mime||"").toLowerCase();
+  return /^image\//.test(mime)?"picture":/font/.test(mime)?"font":/^audio\//.test(mime)?"sound":/^video\//.test(mime)?"video":"data";}
+/* the code of a page without its embedded data: a data: address longer than
+   a few lines, or a run of base64 of 4000 characters or more in quotes,
+   becomes a short note naming what it was. The runs are walked by hand: a
+   pattern over a run of megabytes overflows the browser's stack. */
+var ING_NOT_B64=/[^A-Za-z0-9+\/=%]/g;
+function ingB64End(text,i){ING_NOT_B64.lastIndex=i;var m=ING_NOT_B64.exec(text);return m?m.index:text.length;}
+function ingStripMedia(text){text=String(text||"");var cuts=[],p=0,m,hm,s,e,q,bytes=0;
+  while((p=text.indexOf("data:",p))>=0){hm=/^data:([a-z0-9.+\/-]{0,80})(?:;[a-z0-9=.+-]{1,40}){0,4},/i.exec(text.slice(p,p+240));
+    if(!hm){p+=5;continue;}
+    s=p+hm[0].length;e=ingB64End(text,s);
+    if(e-s>=400){cuts.push([p,e,"data:"+hm[1]+",[embedded "+mediaKind(hm[1])+", "+fmtBytes(e-p)+", left out here]"]);p=e;}else p=s;}
+  var re=/["'`][A-Za-z0-9+\/=%]{4000}/g;
+  while((m=re.exec(text))){q=text.charCodeAt(m.index);s=m.index+1;e=ingB64End(text,s+4000);
+    if(text.charCodeAt(e)===q)cuts.push([s,e,"[encoded data, "+fmtBytes(e-s)+", left out here]"]);
+    re.lastIndex=e;}
+  if(!cuts.length)return {text:text,n:0,bytes:0};
+  cuts.sort(function(a,b){return a[0]-b[0];});
+  var out=[],last=0,n=0;
+  cuts.forEach(function(c){if(c[0]<last)return;out.push(text.slice(last,c[0]),c[2]);bytes+=c[1]-c[0];last=c[1];n++;});
+  out.push(text.slice(last));return {text:out.join(""),n:n,bytes:bytes};}
+function ingIsPage(name,t){return /\.(html?|xhtml)$/i.test(name||"")||/^\s*(<!doctype html|<html[\s>])/i.test(String(t||"").slice(0,2000));}
+/* one text made ready to go with the next message */
+function stageText(name,t,pasted){t=String(t||"");var sf={name:name,cut:false};if(pasted)sf.pasted=true;
+  if(ingIsPage(name,t)){sf.page=IngBig.newId();IngBig.put(sf.page,t);sf.pageChars=t.length;}
+  if(sf.page||/\.(svg|css|js|mjs|cjs|jsx|tsx?|json)$/i.test(name||"")){var sm=ingStripMedia(t);if(sm.n){t=sm.text;sf.media={n:sm.n,bytes:sm.bytes};}}
+  if(t.length>CHAT_FILE_MAX_CHARS){t=t.slice(0,CHAT_FILE_MAX_CHARS);sf.cut=true;}
+  sf.chars=t.length;
+  if(t.length>BIG_AT){sf.ref=IngBig.newId();IngBig.put(sf.ref,t);}else sf.text=t;
+  stagedFiles.push(sf);paintChips();return sf;}
+function stagedText(f){return f.text!=null?f.text:(IngBig.get(f.ref)||"");}
+function unstageFile(i){var f=stagedFiles[i];if(!f)return;stagedFiles.splice(i,1);if(f.ref)IngBig.del(f.ref);if(f.page)IngBig.del(f.page);paintChips();}
+/* R81: a long paste becomes a file chip, not thousands of lines in the field */
+function ingBigPaste(t){t=String(t||"");if(t.length<BIG_PASTE)return false;
+  var sf=stageText(pasteName(t,stagedFiles.filter(function(f){return f.pasted;}).length),t,true),lines=t.split("\n").length;
+  ingToast("Your long paste ("+lines.toLocaleString()+" lines, "+fmtBytes(t.length)+") was added as "+sf.name+", so the chat stays quick. All of it goes with your message.");
+  return true;}
 function stageChatFiles(files){var list=Array.prototype.slice.call(files||[]),imgs=list.filter(function(f){return /^image\//.test(f.type||"")||/\.(png|jpe?g|gif|webp|bmp|heic)$/i.test(f.name||"");});
   if(imgs.length){stageChatImage(imgs[imgs.length-1]);if(imgs.length>1)ingToast("One picture goes with a message; the last one chosen was kept.");}
   var refused=[];
   var chain=Promise.resolve();
   list.filter(function(f){return imgs.indexOf(f)<0;}).forEach(function(f){
     if(!fileReadable(f)){refused.push(f.name);return;}
-    if(f.size>(fileIsPdf(f)?60:20)*1024*1024){refused.push(f.name+" (too large)");return;}
-    chain=chain.then(function(){return readAsText(f).then(function(t){var cut=false;
-      if(t.length>FILE_MAX_CHARS){t=t.slice(0,FILE_MAX_CHARS);cut=true;}
-      stagedFiles.push({name:f.name,text:t,cut:cut});paintChips();},function(e){refused.push(f.name+" ("+(e&&e.message?e.message:"unreadable")+")");});});});
+    var lim=fileIsPdf(f)?60:CHAT_FILE_MAX_MB;
+    if(f.size>lim*1024*1024){refused.push(f.name+" (larger than "+lim+" MB)");return;}
+    chain=chain.then(function(){if(f.size>4*1024*1024)ingToast("Reading "+f.name+" ("+fmtBytes(f.size)+")…");
+      return readAsText(f).then(function(t){var sf=stageText(f.name,t,false);
+        if(sf.media)ingToast(f.name+" was added. Its "+sf.media.n+" embedded picture, font or sound block"+(sf.media.n===1?"":"s")+" ("+fmtBytes(sf.media.bytes)+") are left out of what the model reads, so it reads the app's code; the preview keeps them.");},
+        function(e){refused.push(f.name+" ("+(e&&e.message?e.message:"unreadable")+")");});});});
   return chain.then(function(){if(refused.length)ingToast("Not added: "+refused.join(", ")+". Ingenium reads text files, code, Word documents and PDFs.");});}
 /* the files a message carries, written into it the way a model reads them */
 function attachBlock(files){return files.map(function(f){
-  return "<file name=\""+String(f.name).replace(/"/g,"'")+"\">\n"+f.text+(f.cut?"\n[the rest of this file was left out: it is very long]":"")+"\n</file>";}).join("\n\n");}
+  var left=f.media?"\n[left out above: "+f.media.n+" embedded picture, font or sound block"+(f.media.n===1?"":"s")+", "+fmtBytes(f.media.bytes)+" in all; the page itself keeps them]":"";
+  return "<file name=\""+String(f.name).replace(/"/g,"'")+"\">\n"+stagedText(f)+(f.cut?"\n[the rest of this file was left out: it is very long]":"")+left+"\n</file>";}).join("\n\n");}
 /* ---- skills: saved ways of working, switched on per conversation ---- */
 var BUILTIN_SKILLS=[
   {id:"sk-plain",name:"Plain explainer",instructions:"Explain in plain words and short sentences. Avoid jargon; define any technical term the first time you use it."},
@@ -6002,9 +6291,9 @@ function docOverview(name,text,room){if(text.length<=room)return {text:text,cut:
 function docSources(projEach,share){var out=[],pr=chatProject();
   if(pr)(pr.files||[]).forEach(function(f){if(f&&f.text)out.push({name:f.name,text:f.text,room:projEach});});
   var ai=chatAI();if(ai)(ai.files||[]).forEach(function(f){if(f&&f.text)out.push({name:f.name,text:f.text,room:projEach||4000});});
-  curMsgs().forEach(function(x){if(x.role==="me"&&x.attach){var re=/<file name="([^"]*)">\n([\s\S]*?)\n<\/file>/g,m,fs=[];
-      while((m=re.exec(x.attach)))fs.push({name:m[1],text:m[2]});
-      var whole=x.attach.length<=share,tot=fs.reduce(function(a,f){return a+f.text.length;},0)||1;
+  curMsgs().forEach(function(x){var xa=x.role==="me"?msgAttach(x):"";if(xa){var re=/<file name="([^"]*)">\n([\s\S]*?)\n<\/file>/g,m,fs=[];
+      while((m=re.exec(xa)))fs.push({name:m[1],text:m[2]});
+      var whole=xa.length<=share,tot=fs.reduce(function(a,f){return a+f.text.length;},0)||1;
       fs.forEach(function(f){f.room=whole?Infinity:Math.max(1200,Math.floor(share*f.text.length/tot));out.push(f);});}});
   return out;}
 /* the passages that best match a message, within `room` characters, leaving out what is already shown */
@@ -6026,9 +6315,11 @@ function docRetrieve(docs,query,room){var q=docTerms(query);if(!q.length||room<4
     keep.map(function(c){return "<passage file=\""+String(docs[c.d].name).replace(/"/g,"'")+"\" part=\""+(c.i+1)+" of "+c.n+"\">\n"+c.text.trim()+"\n</passage>";}).join("\n");}
 /* a message's files, each fitted to its share of the model's memory (kept on the message, so it stays the same) */
 function attachFitted(x,share){if(x.attachFit&&x.attachFitFor===share)return x.attachFit;
-  if(x.attach.length<=share){return x.attach;}
-  var files=[],re=/<file name="([^"]*)">\n([\s\S]*?)\n<\/file>/g,m;while((m=re.exec(x.attach)))files.push({name:m[1],text:m[2]});
-  if(!files.length)return x.attach.slice(0,share);
+  var xa=msgAttach(x);
+  if(!xa)return x.attachRef?"[The files sent with this message ("+(x.files||[]).map(function(f){return f.name;}).join(", ")+") are no longer kept on this device.]":"";
+  if(xa.length<=share){return xa;}
+  var files=[],re=/<file name="([^"]*)">\n([\s\S]*?)\n<\/file>/g,m;while((m=re.exec(xa)))files.push({name:m[1],text:m[2]});
+  if(!files.length)return xa.slice(0,share);
   var tot=files.reduce(function(a,f){return a+f.text.length;},0);
   x.attachFit=files.map(function(f){var room=Math.max(1200,Math.floor(share*f.text.length/tot)),ov=docOverview(f.name,f.text,room);
     return "<file name=\""+String(f.name).replace(/"/g,"'")+"\">\n"+ov.text+"\n</file>";}).join("\n\n");
@@ -6485,7 +6776,7 @@ function chatSystemPrompt(budget){var parts=[],pr=chatProject();
   return parts.join("\n\n");}
 /* ---- the chips above the message box: what goes with the next message ---- */
 function paintChips(){var box=$("chatChips");if(!box)return;box.innerHTML="";
-  function chip(label,cls,title,onx){var c=el("span","cchip"+(cls?" "+cls:""));c.title=title||label;
+  function chip(label,cls,title,onx,onopen){var c=el("span","cchip"+(cls?" "+cls:"")+(onopen?" pv":""));c.title=title||label;if(onopen)c.onclick=onopen;
     c.appendChild(el("span","nm",label));if(onx){var x=el("button","cx","✕");x.type="button";x.title="Remove";x.onclick=function(e){e.stopPropagation();onx();};c.appendChild(x);}
     box.appendChild(c);}
   var aiC=chatAI();
@@ -6495,7 +6786,7 @@ function paintChips(){var box=$("chatChips");if(!box)return;box.innerHTML="";
   chatSkills().forEach(function(sk){chip("✦ "+sk.name,"acc",sk.instructions,function(){toggleSkill(sk.id);});});
   if(state.research)chip("🔭 Research","acc","Each reply first searches the web and reads the best pages, then answers with sources.",function(){state.research=false;saveState();paintChips();});
   else if(state.webSearch)chip("🌐 Web search","acc","Each reply first searches the web and answers with sources.",function(){state.webSearch=false;saveState();paintChips();});
-  stagedFiles.forEach(function(f,i){chip("📄 "+f.name+" · "+fmtBytes(f.text.length)+(f.cut?" (cut)":""),"","Goes with your next message"+(f.cut?". It was cut to "+FILE_MAX_CHARS+" characters.":"."),function(){stagedFiles.splice(i,1);paintChips();});});}
+  stagedFiles.forEach(function(f,i){chip((f.pasted?"📋 ":"📄 ")+f.name+" · "+fmtBytes(f.chars)+(f.cut?" (cut)":""),"","Goes with your next message"+(f.cut?". It was cut to "+CHAT_FILE_MAX_CHARS.toLocaleString()+" characters.":".")+(f.media?" "+f.media.n+" embedded picture, font or sound block"+(f.media.n===1?" is":"s are")+" left out of what the model reads ("+fmtBytes(f.media.bytes)+").":"")+(f.page?" Click it to see the page in the stage.":""),function(){unstageFile(i);},f.page?function(){csOpenFile(f);}:null);});}
 /* ---- a screenshot: the computer's own picker in the desktop apps, the browser's otherwise ---- */
 function ingCanScreenshot(){var a=shellApi();return !!((a&&typeof a.take_screenshot==="function")||(navigator.mediaDevices&&typeof navigator.mediaDevices.getDisplayMedia==="function"&&!INB));}
 function ingScreenshot(){var a=shellApi();
@@ -6582,7 +6873,11 @@ $("chatAnyFile").addEventListener("change",function(){var fs=this.files;var copy
   comp.addEventListener("dragover",function(e){if(e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types||[],"Files")>=0){e.preventDefault();comp.classList.add("over");}});
   comp.addEventListener("dragleave",function(){comp.classList.remove("over");});
   comp.addEventListener("drop",function(e){comp.classList.remove("over");if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){e.preventDefault();stageChatFiles(e.dataTransfer.files);}});
-  var inp=$("chatInput");inp.addEventListener("paste",function(e){var it=e.clipboardData&&e.clipboardData.files;if(it&&it.length){e.preventDefault();stageChatFiles(it);}});})();
+  var inp=$("chatInput");inp.addEventListener("paste",function(e){var it=e.clipboardData&&e.clipboardData.files;if(it&&it.length){e.preventDefault();stageChatFiles(it);return;}
+    var tx="";try{tx=(e.clipboardData&&e.clipboardData.getData("text/plain"))||"";}catch(_){}
+    if(tx.length>=BIG_PASTE){e.preventDefault();ingBigPaste(tx);}});
+  /* the edit panel's Paste takes the same road (it calls this before it inserts) */
+  try{window.__ingBigPaste=function(t,txt){return !!(t&&t.id==="chatInput"&&ingBigPaste(txt));};}catch(e){}})();
 /* ---- the dialogs: skills, projects, connections, GitHub ---- */
 function modalOpen(html){var box=$("modalBox");box.classList.remove("pomo-card");box.innerHTML=html;openModal();return box;}
 function openSkills(){var box=modalOpen('<h3>Skills</h3><p class="small muted">A skill is a saved way of working. Switch one on for a conversation with the + key; its instructions then go with every message there. Make your own below.</p><div id="skList"></div>'
@@ -6697,7 +6992,7 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
   function done(){b.textContent="Copied";setTimeout(function(){b.textContent="Copy";},1400);}
   function old(){var ta=document.createElement("textarea");ta.value=t;ta.style.cssText="position:fixed;left:-9999px";document.body.appendChild(ta);ta.select();
     var ok=false;try{ok=document.execCommand("copy");}catch(_){}ta.remove();if(ok)done();else b.textContent="Select and copy";}
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,old);else old();});
+  try{ingClipWrite(t).then(done,old);}catch(_){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,old);else old();}});
 /* one message, drawn; the live reply is redrawn alone while it streams */
 var chatNodeOf=(typeof WeakMap!=="undefined")?new WeakMap():null;
 /* R77: a message rises in the first time it is drawn (the last three of a
@@ -6717,7 +7012,9 @@ function fillMsg(d,mm,keep){var pre=[],post=[],cur=pre,hasThink=false;
   if(mm.cid){var ci=chatImages[mm.cid];
     if(ci){var im=new Image();im.className="chat-img";im.alt=ci.name||"attached picture";im.src=ci.dataUrl;add(im);}
     else if(mm.img)add(el("span","img-ph","🖼 picture · not kept after a reload"));}
-  if(mm.files&&mm.files.length){var fl=el("div","msg-files");mm.files.forEach(function(f){fl.appendChild(el("span","msg-file","📄 "+f.name));});add(fl);}
+  if(mm.files&&mm.files.length){var fl=el("div","msg-files");mm.files.forEach(function(f){var lab=(f.pasted?"📋 ":"📄 ")+f.name+(f.chars?" · "+fmtBytes(f.chars):"");
+      if(f.page){var fb=el("button","msg-file",lab+"  ▸ Preview");fb.type="button";fb.title="Open this page in the stage beside the chat";fb.onclick=function(){csOpenFile(f);};fl.appendChild(fb);}
+      else fl.appendChild(el("span","msg-file",lab));});add(fl);}
   if(mm.role==="me"&&mm.web)add(el("span","web-tag",mm.web==="research"?"🔭 research":"🌐 web search"));
   if(mm.role==="bot"&&mm.status&&mm.live)add(el("span","web-tag",mm.status));
   if(mm.role==="bot"&&mm.note)add(el("div","web-tag",mm.note));
@@ -6726,17 +7023,25 @@ function fillMsg(d,mm,keep){var pre=[],post=[],cur=pre,hasThink=false;
   else if(mm.role==="bot"&&mm.text){
     /* R74: a reply shown whole: a quiet line while it is written */
     if(mm.live&&typeof sup==="function"&&sup("whole")){var cw=el("div","calm-writing");cw.appendChild(el("span","cw-dot"));cw.appendChild(el("span",null,"Writing the reply. It appears in full when it is ready."));add(cw);}
-    else{var md=el("div","md");md.innerHTML=chatMd(mm.text);add(md);}}
-  else if(mm.text)add(document.createTextNode(mm.text));
+    else{var md=el("div","md");md.innerHTML=chatMd(mm.text);add(md);}
+    var pg=mm.live?csPartialOf(mm.text):chatArtifactOf(mm.text);if(pg&&pg.length>40)add(csCard(mm,pg));}
+  else if(mm.text){if(mm.text.length>MSG_FOLD)add(longText(mm));else add(document.createTextNode(mm.text));}
   if(mm.role==="bot"&&!mm.live&&mm.unchecked&&mm.unchecked.length){var un=el("div","msg-unchecked");un.setAttribute("role","note");un.appendChild(el("span","mu-mark","!"));un.appendChild(el("span",null,ingUncheckedNote(mm.unchecked)));add(un);}
   if(mm.role==="bot"&&mm.sources&&mm.sources.length){var so=el("div","msg-sources");so.appendChild(el("b",null,"Sources"));var ol=el("ol");
     mm.sources.forEach(function(x){var li=el("li"),a=el("a",null,x.title||x.url);a.href=x.url;a.target="_blank";a.rel="noopener noreferrer";li.appendChild(a);ol.appendChild(li);});
     so.appendChild(ol);add(so);}
   if(mm.role==="bot"&&mm.text&&!mm.live&&!mm.preview&&typeof sup==="function"){var acts=el("div","msg-acts");
     if(supCanSpeak()&&sup("voice")){var rb=el("button","msg-act","Read aloud");rb.type="button";rb.onclick=function(){var tmp=el("div");tmp.innerHTML=chatMd(mm.text);supSpeak(tmp.textContent,rb);};acts.appendChild(rb);}
-    var cpb=el("button","msg-act","Copy");cpb.type="button";cpb.onclick=function(){supCopy(mm.text,cpb);};acts.appendChild(cpb);
+    var cpb=el("button","msg-act","Copy");cpb.type="button";cpb.title="Copy the whole message";cpb.onclick=function(){supCopy(mm.text,cpb);};acts.appendChild(cpb);
     var aiT=chatAI();if(aiT){var tb=el("button","msg-act","Teach it");tb.type="button";tb.title="Correct this reply; the corrected answer becomes a lesson "+aiT.name+" follows when a question is like it";tb.onclick=function(){aiTeach(aiT,mm);};acts.appendChild(tb);}
     add(acts);}
+  /* R83: your own message can be copied too, or put back in the box to change and send again */
+  if(mm.role==="me"&&!mm.live&&(mm.text||(mm.files&&mm.files.length))){var ua=el("div","msg-acts me-acts");
+    var mc=el("button","msg-act","Copy");mc.type="button";mc.title=mm.text?"Copy this message":"Copy what this message carried";
+    mc.onclick=function(){msgCopyText(mm).then(function(t){supCopy(t,mc);});};ua.appendChild(mc);
+    if(mm.text){var mu=el("button","msg-act","Use again");mu.type="button";mu.title="Put this message back in the box below, to change it and send it again";
+      mu.onclick=function(){var ci=$("chatInput");if(!ci)return;ci.value=mm.text;try{ci.dispatchEvent(new Event("input",{bubbles:true}));}catch(e){}ci.focus();try{ci.setSelectionRange(ci.value.length,ci.value.length);}catch(e){}};ua.appendChild(mu);}
+    add(ua);}
   if(keep&&hasThink&&keep.parentNode===d){thinkPaint(keep,mm);
     while(d.firstChild&&d.firstChild!==keep)d.removeChild(d.firstChild);
     while(keep.nextSibling)d.removeChild(keep.nextSibling);
@@ -6744,6 +7049,23 @@ function fillMsg(d,mm,keep){var pre=[],post=[],cur=pre,hasThink=false;
   d.innerHTML="";pre.forEach(function(n){d.appendChild(n);});
   if(hasThink)d.appendChild(thinkBox(mm));
   post.forEach(function(n){d.appendChild(n);});}
+/* R83: the text a message's Copy gives: its words; a message that was only a
+   paste gives back the pasted text itself */
+function msgCopyText(mm){if(!mm)return Promise.resolve("");if(mm.role!=="me"||mm.text)return Promise.resolve(String(mm.text||""));
+  return ingBigEnsureChat().then(function(){var blk=msgAttach(mm),out=[],re=/<file name="([^"]*)">\n([\s\S]*?)\n<\/file>/g,m;
+    while((m=re.exec(blk))){var f=(mm.files||[]).filter(function(x){return x.name===m[1];})[0];if(f&&f.pasted)out.push(m[2]);}
+    return out.length?out.join("\n\n"):(mm.files||[]).map(function(f){return f.name;}).join(", ");});}
+/* the whole text of the message a right-click lands on (the edit panel asks) */
+try{window.__ingMsgAt=function(node){var d=node&&(node.nodeType===1?node:node.parentNode);d=d&&d.closest?d.closest("#chatScroll .msg"):null;
+  var mm=d&&msgOfNode?msgOfNode.get(d):null;if(!mm)return null;
+  return {node:d,text:function(){return msgCopyText(mm);}};};}catch(e){}
+/* R81: a very long message shows its opening, and all of it in a scrolling box on request */
+var msgUnfold=(typeof WeakSet!=="undefined")?new WeakSet():null;
+function longText(mm){var w=el("div","msg-long"),open=!!(msgUnfold&&msgUnfold.has(mm));
+  var body=el("div","msg-long-body"+(open?" open":""));body.textContent=open?mm.text:mm.text.slice(0,1800)+"…";w.appendChild(body);
+  var b=el("button","msg-act msg-long-btn",open?"Show less":"Show all ("+mm.text.length.toLocaleString()+" characters)");b.type="button";
+  b.onclick=function(){if(!msgUnfold)return;if(open)msgUnfold.delete(mm);else msgUnfold.add(mm);var d=b.closest(".msg");if(d)fillMsg(d,mm,thinkBoxIn(d));};
+  w.appendChild(b);return w;}
 function thinkBoxIn(d){for(var c=d&&d.firstChild;c;c=c.nextSibling)if(c.classList&&c.classList.contains("think-box"))return c;return null;}
 /* R68: the model's thinking, as Claude and Ollama show it: a bar that says
    "Thinking" while the thoughts come (with their latest line), and "Thought for
@@ -6817,7 +7139,7 @@ function renderChatLive(mm){var d=chatNodeOf&&chatNodeOf.get(mm);
   if(_liveRaf)return;
   var paint=function(){_liveRaf=0;var sc=$("chatScroll"),stick=sc.scrollHeight-sc.scrollTop-sc.clientHeight<80;
     var ob=d.querySelector(".think-body"),follow=!ob||ob.scrollHeight-ob.scrollTop-ob.clientHeight<28,keep=ob?ob.scrollTop:0;
-    fillMsg(d,mm,thinkBoxIn(d));var nb=d.querySelector(".think-body");if(nb&&(nb!==ob||follow))nb.scrollTop=follow?nb.scrollHeight:keep;
+    fillMsg(d,mm,thinkBoxIn(d));try{csLiveFrom(mm);}catch(e){}var nb=d.querySelector(".think-body");if(nb&&(nb!==ob||follow))nb.scrollTop=follow?nb.scrollHeight:keep;
     if(stick)sc.scrollTop=sc.scrollHeight;};
   _liveRaf=(window.requestAnimationFrame||function(f){return setTimeout(f,16);})(paint);}
 /* R78: reading ahead. Before the first message of a conversation, the engine on this
@@ -6846,11 +7168,17 @@ function renderChat(){var sc=$("chatScroll");try{detectChatPreview();}catch(e){}
   sc.scrollTop=sc.scrollHeight;paintChatSwitch();}
 function trimChat(){var ms=curMsgs();while(ms.length>80)ms.shift();}
 /* R66: what the composer holds (words, a picture, files) leaves as one message */
-function sendChat(){var inp=$("chatInput"),text=inp.value.trim(),img=stagedImage,files=stagedFiles.slice();
+function sendChat(){var inp=$("chatInput"),text=inp.value.trim(),img=stagedImage,files;
+  /* R81: a message as long as a whole app goes as a file, drawn as a chip */
+  if(text.length>MSG_BIG){stageText(pasteName(text,stagedFiles.filter(function(f){return f.pasted;}).length),text,true);text="";}
+  files=stagedFiles.slice();
   if(!text&&!img&&!files.length)return;
   closePlus();
   var rec={role:"me",text:text};
-  if(files.length){rec.files=files.map(function(f){return {name:f.name,chars:f.text.length};});rec.attach=attachBlock(files);}
+  if(files.length){rec.files=files.map(function(f){var o={name:f.name,chars:f.chars};if(f.page)o.page=f.page;if(f.pasted)o.pasted=1;if(f.media)o.media=f.media;return o;});
+    var blk=attachBlock(files);
+    if(blk.length>BIG_AT){rec.attachRef=IngBig.newId();rec.attachChars=blk.length;IngBig.put(rec.attachRef,blk);}else rec.attach=blk;
+    files.forEach(function(f){if(f.ref)IngBig.del(f.ref);});}
   if(img){rec.cid=uid();rec.img=true;chatImages[rec.cid]={name:img.name,dataUrl:img.dataUrl,buf:img.buf};}
   if(state.research)rec.web="research";else if(state.webSearch)rec.web="search";
   else{var aiW=chatAI();if(aiW&&aiW.tools&&(aiW.tools.web==="search"||aiW.tools.web==="research"))rec.web=aiW.tools.web;}
@@ -6878,7 +7206,7 @@ function replyTokens(){var n=+$("ctlTokens").value||1024;return thinkOn()?n+1536
    passages chosen for it and any web results are kept on the message. */
 function chatHistory(canSee,prep){var budget=chatBudget();
   var sys=chatSystemPrompt(budget);
-  var all=curMsgs().filter(function(x){return !x.preview&&!x.live&&(x.text||x.attach||(x.cid&&chatImages[x.cid]));});
+  var all=curMsgs().filter(function(x){return !x.preview&&!x.live&&(x.text||x.attach||x.attachRef||(x.cid&&chatImages[x.cid]));});
   var st=0;for(var wi=all.length-1;wi>=0;wi--)if(all[wi].winStart){st=wi;break;}
   if(all.length-st>24)st=all.length-16;
   var hist=all.slice(st);
@@ -6898,7 +7226,7 @@ function chatHistory(canSee,prep){var budget=chatBudget();
   var msgs=hist.map(function(x){var role=x.role==="me"?"user":"assistant",body=x.text||"";
     if(role==="user"){
       /* the files and what was found first, the message itself last: small models answer better so */
-      var lead=[];if(x.webCtx)lead.push(x.webCtx);if(x.attach)lead.push(attachFitted(x,share));if(x.passages)lead.push(x.passages);
+      var lead=[];if(x.webCtx)lead.push(x.webCtx);if(x.attach||x.attachRef){var af=attachFitted(x,share);if(af)lead.push(af);}if(x.passages)lead.push(x.passages);
       if(lead.length)body=lead.join("\n\n")+(body?"\n\n"+body:"");
       if(wantNote&&x.rulesNote)body+=x.rulesNote;}
     var ci=x.cid&&chatImages[x.cid];
@@ -6917,13 +7245,14 @@ function chatHistory(canSee,prep){var budget=chatBudget();
 /* said under a reply when the message was longer than the model's memory */
 function cutNote(){return "Your message was longer than this model's memory, so only its first part was read. A larger Memory in Controls, or a shorter message, avoids this.";}
 /* before a reply: what the web finds, when a switch asks for it (filled in by the network part) */
-function chatPrepare(rec,bot){if(!rec.web||typeof webAugment!=="function")return Promise.resolve(null);
-  return webAugment(rec,bot).catch(function(e){bot.status="";bot.webNote="The web could not be reached ("+(e&&e.message?e.message:e)+"), so this reply uses what the model knows.";return null;});}
+function chatPrepare(rec,bot){return ingBigEnsureChat().then(function(){
+  if(!rec.web||typeof webAugment!=="function")return null;
+  return webAugment(rec,bot).catch(function(e){bot.status="";bot.webNote="The web could not be reached ("+(e&&e.message?e.message:e)+"), so this reply uses what the model knows.";return null;});});}
 function sendRec(rec){
   try{var aiB=chatAI(),rb=aiB&&aiBaseRec(aiB);if(rb&&aiModelReady(rb)&&state.activeModelId!==rb.id&&chatSource()!=="cloud")setActive(rb.id,{fromUser:true});}catch(e){}
   if(chatSource()==="cloud"&&state.cloud&&state.cloud.on&&state.cloud.provider){
     if(rec.cid){curMsgs().push({role:"bot",preview:true,text:"The picture stays here: pictures go to a model on this device that can see them, not through the connection."});trimChat();saveState();}
-    if(!rec.text&&!rec.attach){renderChat();return;}
+    if(!rec.text&&!rec.attach&&!rec.attachRef){renderChat();return;}
     return sendCloud(rec);}
   var m=state.models.filter(function(x){return x.id===state.activeModelId;})[0];
   var engineLive=Engine.status==="ready"&&m&&Engine.modelId===m.id;
@@ -7184,13 +7513,242 @@ function chatArtifactOf(text){
   var doc=text.match(/<!doctype html[\s\S]*<\/html>/i)||text.match(/<html[\s>][\s\S]*<\/html>/i);
   if(doc&&doc[0]&&doc[0].trim().length>40)return doc[0].trim();
   return null;}
-function detectChatPreview(){var msgs=curMsgs();if(!msgs)return;var html=null;
-  for(var i=msgs.length-1;i>=0;i--){var m=msgs[i];if(m.role!=="bot")continue;
-    html=chatArtifactOf(m.text||"");if(html)break;}
-  var pv=$("chatPreview");var fr=$("chatPreviewFrame");if(!pv||!fr)return;
-  if(html&&html.length>40){pv.removeAttribute("hidden");
-    if(window._chatPreviewHtml!==html){fr.srcdoc=html+(window.__ING_CTX_SNIPPET||"");window._chatPreviewHtml=html;}}
-  else{pv.setAttribute("hidden","");window._chatPreviewHtml=null;}}
+/* ============ R82: the chat's stage, beside the conversation ============
+   A page a reply carries, or an app sent as a file, opens on the right of
+   the chat, as Claude shows an artifact, in the Forge's preview as its 628
+   build draws it: one row (Preview or Code, the name, the zoom, Full, and a
+   More of its own: Changes, roll up, Float, Dim, hide the chat, Edit in
+   Build, Close), one quiet line, the page, and Copy, Open and Download
+   beneath. The line between the chat and the stage drags, or takes the arrow
+   keys, and its place is remembered. A reply that writes a page shows the
+   code arriving, then the page itself when it is done; on a wide window the
+   stage opens by itself for it, and on a narrow one it waits behind the card
+   in the reply. What a page keeps (its settings, its data) stays with it on
+   this device, without the page ever reaching Ingenium's own store. */
+var ING_CAPTURE='<script>(function(){function send(l,a){try{parent.postMessage({__fdConsole:1,level:l,text:Array.prototype.map.call(a,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x);}catch(e){return String(x);}}).join(" ")},"*");}catch(e){}}["log","warn","error","info"].forEach(function(k){var o=console[k]?console[k].bind(console):function(){};console[k]=function(){send(k,arguments);o.apply(null,arguments);};});window.addEventListener("error",function(e){send("error",[e.message+" ("+(e.lineno||"?")+")"]);});})();<\/script>';
+var ING_STAGE_SHIM="<scr"+"ipt>"+"/* R82: a page in the stage runs in a sandbox with no storage of its own,\n   so an app that keeps its data in localStorage would stop at its first\n   line. A stand-in store takes its place: it starts from what the page kept\n   the last time (window.__ING_STAGE_SEED) and hands every change to\n   Ingenium, which keeps it for that page on this device. The page never\n   reaches Ingenium's own store. */\n(function(){var seed={};try{seed=window.__ING_STAGE_SEED||{};}catch(e){}\n  function tell(op,k,v){try{parent.postMessage({__ingStore:1,op:op,k:k,v:v},\"*\");}catch(e){}}\n  function mk(d,keep){return {getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null;},\n    setItem:function(k,v){k=String(k);v=String(v);d[k]=v;if(keep)tell(\"set\",k,v);},\n    removeItem:function(k){k=String(k);delete d[k];if(keep)tell(\"remove\",k);},\n    clear:function(){for(var k in d)delete d[k];if(keep)tell(\"clear\");},\n    key:function(i){return Object.keys(d)[i]||null;},get length(){return Object.keys(d).length;}};}\n  var made={localStorage:function(){var d={};for(var k in seed)if(Object.prototype.hasOwnProperty.call(seed,k))d[k]=String(seed[k]);return mk(d,true);},sessionStorage:function(){return mk({},false);}};\n  [\"localStorage\",\"sessionStorage\"].forEach(function(n){var ok=false;try{ok=!!window[n]&&(window[n].setItem(\"__t\",\"1\"),window[n].removeItem(\"__t\"),true);}catch(e){ok=false;}\n    if(!ok){try{Object.defineProperty(window,n,{value:made[n](),configurable:true,writable:true});}catch(e){}}});})();"+"<\/scr"+"ipt>";
+/* the page as the frame runs it: what it kept, the console catcher and the
+   stand-in store go just after the doctype, so a page that asks for
+   standards mode keeps it */
+function ingStageDoc(html,seed){html=String(html||"");
+  var sd=seed?"<scr"+"ipt>window.__ING_STAGE_SEED="+JSON.stringify(seed).replace(/</g,"\\u003c").replace(/\u2028/g,"\\u2028").replace(/\u2029/g,"\\u2029")+";<\/scr"+"ipt>":"";
+  var pre=ING_CAPTURE+sd+ING_STAGE_SHIM,m=/^(\ufeff?\s*<!doctype[^>]*>)/i.exec(html);
+  return (m?m[1]+pre+html.slice(m[1].length):pre+html)+(window.__ING_CTX_SNIPPET||"");}
+var csCur=null,csMode="preview",csZoom=1,csLines=0,csLiveT=0,csChat=null,csView="dock",csStoreCur=null,
+    csSeen=(typeof WeakSet!=="undefined")?new WeakSet():null;
+function csWide(){return (window.innerWidth||1200)>920;}
+function csIsOn(){return document.body.classList.contains("cs-on");}
+function csTitleOf(html,fb){var m=/<title[^>]*>([^<]{1,80})<\/title>/i.exec(String(html||"").slice(0,20000));return m&&m[1].trim()?m[1].trim():fb;}
+/* the code of a page as the frame would be given it, unfinished or whole */
+function csPartialOf(t){t=String(t||"");var m=/```(?:html|xhtml|svg|xml)[^\n]*\n([\s\S]*)$/i.exec(t);
+  if(m){var b=m[1],e=b.indexOf("```");b=e>=0?b.slice(0,e):b;return b.length>20?b:null;}
+  var d=t.search(/<!doctype html|<html[\s>]/i);return d>=0&&t.length-d>20?t.slice(d):null;}
+function csPaintKey(){var k=$("csShow");if(k)k.hidden=!csCur||csIsOn();}
+function csSaveOpen(on){try{localStorage.setItem("ingenium_cs_open",on?"1":"0");}catch(e){}}
+function csWantOpen(){try{return localStorage.getItem("ingenium_cs_open")==="1"&&csWide();}catch(e){return false;}}
+function csOpen(on,user){document.body.classList.toggle("cs-on",!!on);if(!on){csSetView("dock");csMenu(false);}
+  if(user!==undefined)csSaveOpen(!!on);csApplyWidth();csPaintKey();setTimeout(csMeasure,0);}
+function csName(){var n=$("csName");if(!n)return;
+  if(!csCur){n.textContent="nothing yet";n.title="";return;}
+  n.textContent=csCur.live?"writing "+(csCur.name||"the page")+"…":(csCur.name||"page")+(csCur.kind==="reply"?" · from the reply":"")+"  ·  "+fmtBytes(csCur.html.length)+(csLines?"  ·  "+csLines+" console message"+(csLines===1?"":"s"):"");
+  n.title=n.textContent;}
+function csPaintMode(){var live=!!(csCur&&csCur.live),cd=live||csMode==="code",pv=!cd&&csMode==="preview",ch=!cd&&csMode==="changes";
+  $("csViewPrev").classList.toggle("active",pv);$("csViewCode").classList.toggle("active",cd);
+  $("csViewPrev").setAttribute("aria-pressed",pv);$("csViewCode").setAttribute("aria-pressed",cd);$("csChanges").setAttribute("aria-pressed",ch);
+  $("csFrame").hidden=!pv;$("csCode").hidden=!cd;$("csChangesView").hidden=!ch;$("csPane").setAttribute("data-mode",pv?"preview":(cd?"code":"changes"));}
+/* the quiet line under the row, said once until it is closed */
+function csPaintLine(){var ln=$("csLine"),tx=$("csLineText");if(!ln||!tx)return;var gone=false;try{gone=localStorage.getItem("ingenium_cs_line")==="1";}catch(e){}
+  ln.hidden=gone||!csCur;tx.textContent="The page runs here as it would in a browser. What it keeps (its settings, its data) stays with it on this device.";}
+/* the code view: a page larger than a few megabytes shows its embedded data as short notes */
+function csCodeText(){var h=csCur?csCur.html:"";if(h.length<=2500000)return {text:h,note:""};
+  var sm=ingStripMedia(h);return {text:sm.text,note:sm.n?"Shown without its "+sm.n+" embedded picture, font or sound block"+(sm.n===1?"":"s")+" ("+fmtBytes(sm.bytes)+"), each named where it stands. Copy, Open and Download keep the whole page.":""};}
+function csRenderCode(follow){var pre=$("csCode");if(!pre||!csCur)return;var ct=csCodeText();
+  pre.textContent="";if(ct.note)pre.appendChild(el("span","cs-code-note",ct.note));pre.appendChild(document.createTextNode(ct.text));
+  if(follow)pre.scrollTop=pre.scrollHeight;}
+/* ---- Changes: this version against the one before it in the conversation ---- */
+function csPrevOf(pg){if(!pg||pg.kind!=="reply"||!pg.msg)return null;var ms=curMsgs(),i=ms.indexOf(pg.msg),near=null;
+  for(var j=i-1;j>=0;j--){var m=ms[j];if(m.role!=="bot"||m.preview)continue;var h=chatArtifactOf(m.text||"");if(!h||h.length<=40)continue;
+    if(csTitleOf(h,"")===csTitleOf(pg.html,"")&&csTitleOf(h,""))return {msg:m,html:h};if(!near)near={msg:m,html:h};}
+  return near;}
+function csLcs(A,B){var n=A.length,m=B.length,w=m+1,T=new Uint32Array((n+1)*w),i,j;
+  for(i=n-1;i>=0;i--)for(j=m-1;j>=0;j--)T[i*w+j]=A[i]===B[j]?T[(i+1)*w+j+1]+1:Math.max(T[(i+1)*w+j],T[i*w+j+1]);
+  var out=[];i=0;j=0;
+  while(i<n&&j<m){if(A[i]===B[j]){out.push(["ctx",A[i]]);i++;j++;}else if(T[(i+1)*w+j]>=T[i*w+j+1]){out.push(["del",A[i]]);i++;}else{out.push(["add",B[j]]);j++;}}
+  while(i<n)out.push(["del",A[i++]]);while(j<m)out.push(["add",B[j++]]);return out;}
+/* the lines that changed: the same start and end are set aside first, so a change in one place costs little */
+function csDiff(oldT,newT){var a=String(oldT).split("\n"),b=String(newT).split("\n"),p=0,ea=a.length,eb=b.length;
+  while(p<ea&&p<eb&&a[p]===b[p])p++;while(ea>p&&eb>p&&a[ea-1]===b[eb-1]){ea--;eb--;}
+  var A=a.slice(p,ea),B=b.slice(p,eb),mid=A.length*B.length>4000000?A.map(function(x){return ["del",x];}).concat(B.map(function(x){return ["add",x];})):csLcs(A,B);
+  return a.slice(0,p).map(function(x){return ["ctx",x];}).concat(mid,a.slice(ea).map(function(x){return ["ctx",x];}));}
+function csRenderChanges(){var v=$("csChangesView");if(!v||!csCur)return;v.innerHTML="";
+  var prev=csPrevOf(csCur);
+  if(!prev){v.appendChild(el("span","cs-ch-head",csCur.kind==="reply"?"No changes to show: this is the first version of this page in the conversation.":"No changes to show: "+(csCur.name||"this page")+" has no earlier version here. A page a reply writes shows here what it changed from the version before it."));return;}
+  var rows=csDiff(prev.html,csCur.html),add=0,del=0;rows.forEach(function(r){if(r[0]==="add")add++;else if(r[0]==="del")del++;});
+  v.appendChild(el("span","cs-ch-head",(add||del)?"What this version changed from the one before it in the conversation: "+add+" line"+(add===1?"":"s")+" added, "+del+" removed. Unchanged lines are folded away.":"This version is the same as the one before it."));
+  var keep={},CTX=3,shown=0,MAX=4000;rows.forEach(function(r,i){if(r[0]!=="ctx")for(var k=Math.max(0,i-CTX);k<=Math.min(rows.length-1,i+CTX);k++)keep[k]=1;});
+  var frag=document.createDocumentFragment(),gap=0;
+  function flushGap(){if(gap){frag.appendChild(el("div","cs-ch-gap","… "+gap+" unchanged line"+(gap===1?"":"s")+" …"));gap=0;}}
+  for(var i=0;i<rows.length&&shown<MAX;i++){if(!keep[i]){gap++;continue;}flushGap();frag.appendChild(el("div","cs-ch-row "+rows[i][0],rows[i][1]||" "));shown++;}
+  flushGap();if(shown>=MAX)frag.appendChild(el("div","cs-ch-gap","… the rest is left out here: the change is very long …"));v.appendChild(frag);}
+/* ---- what a page keeps, kept for it on this device ---- */
+function csStoreKey(pg){return pg.storeKey||((pg.kind==="file"?"file:":"page:")+String(pg.name||"page").slice(0,120));}
+function csStoreLoad(key){state.stageStores=state.stageStores||{};var id=state.stageStores[key];if(!id)return Promise.resolve({});
+  return IngBig.load(id).then(function(t){try{var o=JSON.parse(t||"{}");return o&&typeof o==="object"?o:{};}catch(e){return {};}},function(){return {};});}
+function csStoreChange(d){var cur=csStoreCur;if(!cur)return;var data=cur.data;
+  if(d.op==="set"&&typeof d.k==="string")data[d.k]=String(d.v);else if(d.op==="remove")delete data[d.k];else if(d.op==="clear"){for(var k in data)delete data[k];}else return;
+  clearTimeout(cur.t);cur.t=setTimeout(function(){var txt;try{txt=JSON.stringify(cur.data);}catch(e){return;}
+    if(txt.length>16*1024*1024){if(!cur.said){cur.said=1;csPush("warn","Ingenium keeps up to 16 MB of what a page stores; this page has stored more, so its newest changes are kept only while it is open.");}return;}
+    state.stageStores=state.stageStores||{};var id=state.stageStores[cur.key];if(!id){id=IngBig.newId();state.stageStores[cur.key]=id;saveState();}
+    IngBig.put(id,txt);},500);}
+function csRender(){var fr=$("csFrame"),wrap=$("csFrameWrap");if(!fr||!wrap)return;csName();csPaintMode();csPaintLine();
+  if(!csCur){wrap.removeAttribute("data-lived");fr.removeAttribute("srcdoc");return;}
+  wrap.setAttribute("data-lived","1");
+  if(csCur.live){csRenderCode(true);return;}
+  if(csMode==="code"){csRenderCode(false);return;}
+  if(csMode==="changes"){csRenderChanges();return;}
+  if(csCur._ran!==csCur.html){var pg=csCur,key=csStoreKey(pg);pg._ran=pg.html;csLines=0;var cp=$("csConsole");if(cp){cp.innerHTML="";cp.classList.remove("has");}csName();
+    csStoreLoad(key).then(function(seed){if(csCur!==pg)return;csStoreCur={key:key,data:seed,t:0};fr.srcdoc=ingStageDoc(pg.html,seed);});}}
+function csShow(page,opts){opts=opts||{};csCur=page;csCur.chat=csCur.chat||curChat().id;
+  if(!csCur.live)csMode="preview";
+  if(!opts.quiet)csOpen(true,opts.user?true:undefined);
+  csRender();csPaintKey();}
+function csFromReply(m,html){return {kind:"reply",msg:m,html:html,name:csTitleOf(html,"page")};}
+function csOpenFile(f){if(!f||!f.page)return;
+  IngBig.load(f.page).then(function(html){if(!html){ingToast("This page is no longer kept on this device.");return;}
+    csShow({kind:"file",html:html,name:f.name},{user:true});});}
+/* a reply as it is written: its page's code, in the stage */
+function csLiveFrom(mm){if(!mm||!mm.live)return;var now=Date.now();if(now-csLiveT<250)return;csLiveT=now;
+  var part=csPartialOf(mm.text||"");if(!part)return;
+  if(!csCur||csCur.msg!==mm){if(!(csWide()||csIsOn()))return;
+    csCur={kind:"reply",chat:curChat().id,msg:mm,html:part,name:csTitleOf(part,"the page"),live:true};csOpen(true);csRender();return;}
+  csCur.html=part;csCur.name=csTitleOf(part,csCur.name);csName();csRenderCode(true);}
+/* after every redraw of the chat: the newest page of this conversation, offered or shown */
+function detectChatPreview(){var c=curChat(),msgs=c.messages||[],hit=null;
+  for(var i=msgs.length-1;i>=0;i--){var m=msgs[i];if(m.role!=="bot"||m.preview||m.live)continue;
+    var html=chatArtifactOf(m.text||"");if(html&&html.length>40){hit={m:m,html:html};break;}}
+  if(csChat!==c.id){var first=csChat===null;csChat=c.id;
+    if(csSeen)msgs.forEach(function(x){csSeen.add(x);});
+    if(csCur&&csCur.chat!==c.id){csCur=null;csStoreCur=null;csRender();}
+    if(hit&&!csCur)csShow(csFromReply(hit.m,hit.html),{quiet:!(first?csWantOpen():csIsOn())});
+    else if(!csCur&&csIsOn())csOpen(false);
+    csPaintKey();return;}
+  if(!hit){csPaintKey();return;}
+  if(csCur&&csCur.msg===hit.m){if(csCur.live||csCur.html!==hit.html){csCur.html=hit.html;csCur.name=csTitleOf(hit.html,"page");
+      var was=csCur.live;csCur.live=false;if(was)csMode="preview";csRender();}
+    csPaintKey();return;}
+  var fresh=!!csSeen&&!csSeen.has(hit.m);if(csSeen)csSeen.add(hit.m);
+  if(fresh)csShow(csFromReply(hit.m,hit.html),{quiet:!(csWide()||csIsOn())});
+  csPaintKey();}
+/* the card a reply shows for its page */
+function csCard(mm,html){var live=!!mm.live,b=el("button","cs-card"+(live?" live":""));b.type="button";
+  b.appendChild(el("span","cs-card-ico","▣"));var tx=el("span","cs-card-tx");
+  tx.appendChild(el("span","cs-card-name",live?"Writing "+csTitleOf(html,"a page")+"…":csTitleOf(html,"A page from this reply")));
+  tx.appendChild(el("span","cs-card-sub",live?"The code shows in the stage as it is written":"Interactive page · "+fmtBytes(html.length)+" · open it in the stage"));
+  b.appendChild(tx);b.title=live?"Show the stage":"Open this page in the stage beside the chat";
+  b.onclick=function(){if(live){csOpen(true,true);return;}csShow(csFromReply(mm,html),{user:true});};return b;}
+/* the stage's console: the messages of the page in the stage */
+function csPush(level,text){var pane=$("csConsole");if(!pane)return;var line=el("div",level==="error"?"cerr":(level==="warn"?"cwarn":""));
+  line.textContent=(level==="error"?"✕ ":(level==="warn"?"! ":"› "))+text;pane.appendChild(line);pane.classList.add("has");pane.scrollTop=pane.scrollHeight;csLines++;csName();}
+function csFromStage(src){var f=$("csFrame");return !!(f&&src&&src===f.contentWindow);}
+/* views: docked beside the chat, floated, full, rolled up, closed */
+function csSetView(v){csView=v;if(v==="dock")document.body.removeAttribute("data-csview");else document.body.setAttribute("data-csview",v);
+  var fl=$("csFloat"),fu=$("csFull");if(!fl||!fu)return;
+  fl.setAttribute("aria-pressed",v==="float");fu.setAttribute("aria-pressed",v==="full");
+  fl.textContent=v==="float"?"🪟 Dock":"🪟 Float";fu.textContent=v==="full"?"⛶ Undock":"⛶ Full";
+  if(v==="float"){var r=$("csPane").getBoundingClientRect(),bs=document.body.style,w=Math.min(r.width||640,(window.innerWidth||1200)-40);
+    bs.setProperty("--cs-x",Math.max(8,Math.min(r.left,(window.innerWidth||1200)-w-8))+"px");bs.setProperty("--cs-y",Math.max(8,r.top)+"px");
+    bs.setProperty("--cs-w",w+"px");bs.setProperty("--cs-h",Math.max(300,Math.min(r.height||520,(window.innerHeight||800)-40))+"px");}
+  setTimeout(csMeasure,0);}
+function csMenu(open){var m=$("csMenu"),k=$("csMore");if(!m||!k)return;m.hidden=!open;k.setAttribute("aria-expanded",open?"true":"false");}
+/* a narrower stage: the row tightens before it would wrap */
+function csMeasure(){var card=document.querySelector("#page-chat .chat-card");if(card)card.classList.toggle("cc-tight",csIsOn()&&card.getBoundingClientRect().width<600);
+  var bar=$("csBar");if(!bar||!csIsOn())return;var w=bar.getBoundingClientRect().width;
+  bar.setAttribute("data-w",w<370?"n1 n2 n3":(w<440?"n1 n2":(w<560?"n1":"")));}
+/* the width the chat keeps beside the stage */
+function csApplyWidth(){var col=$("chatCol");if(!col)return;var w=0;try{w=+localStorage.getItem("ingenium_cs_w")||0;}catch(e){}
+  if(w>0)col.style.setProperty("--cs-chat-w",w+"px");else col.style.removeProperty("--cs-chat-w");}
+function csSetWidth(px,keep){var col=$("chatCol");if(!col)return;var r=col.getBoundingClientRect();
+  var w=Math.round(Math.max(300,Math.min(r.width-352,px)));col.style.setProperty("--cs-chat-w",w+"px");csMeasure();
+  if(keep){try{localStorage.setItem("ingenium_cs_w",String(w));}catch(e){}}}
+function csCopyText(t,btn){var done=function(){if(!btn)return;var o=btn.textContent;btn.textContent="Copied";setTimeout(function(){btn.textContent=o;},1400);};
+  var old=function(){try{var ta=el("textarea");ta.value=t;ta.style.cssText="position:fixed;left:-9999px";document.body.appendChild(ta);ta.select();var ok=document.execCommand("copy");ta.remove();if(ok)done();}catch(e){}};
+  try{ingClipWrite(t).then(done,old);}catch(e){old();}}
+(function(){if(!$("csPane"))return;
+  $("csShow").onclick=function(){if(!csCur)return;csOpen(true,true);csRender();};
+  $("csMore").onclick=function(e){e.stopPropagation();csMenu($("csMenu").hidden);};
+  document.addEventListener("click",function(e){if(!$("csMenu").hidden&&!(e.target.closest&&e.target.closest(".cs-more-wrap")))csMenu(false);});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!$("csMenu").hidden){csMenu(false);try{$("csMore").focus();}catch(_){}}});
+  function item(id,fn){$(id).onclick=function(){csMenu(false);fn.call(this);};}
+  item("csClose",function(){csOpen(false,true);});
+  item("csHideChat",function(){var hid=document.body.getAttribute("data-cschat")==="hidden";
+    if(hid)document.body.removeAttribute("data-cschat");else document.body.setAttribute("data-cschat","hidden");
+    this.textContent=hid?"‹ Hide the chat":"› Show the chat";setTimeout(csMeasure,0);});
+  $("csShowChat").onclick=function(){document.body.removeAttribute("data-cschat");$("csHideChat").textContent="‹ Hide the chat";setTimeout(csMeasure,0);};
+  $("csViewPrev").onclick=function(){csMode="preview";if(csCur)csCur._ran=null;csRender();};
+  $("csViewCode").onclick=function(){csMode="code";csRender();};
+  item("csChanges",function(){csMode=csMode==="changes"?"preview":"changes";if(csCur&&csMode==="preview")csCur._ran=null;csRender();});
+  item("csDim",function(){var r=document.body.getAttribute("data-csdim")==="1";document.body.setAttribute("data-csdim",r?"0":"1");this.setAttribute("aria-pressed",r?"false":"true");});
+  function zoom(z){csZoom=Math.max(.4,Math.min(2,Math.round(z*100)/100));$("csZoomFit").textContent=Math.round(csZoom*100)+"%";
+    $("csFrame").style.zoom=Math.abs(csZoom-1)<.005?"":String(csZoom);}
+  $("csZoomIn").onclick=function(){zoom(csZoom+(csZoom<0.6?0.05:0.1));};
+  $("csZoomOut").onclick=function(){zoom(csZoom-(csZoom<=0.6?0.05:0.1));};
+  $("csZoomFit").onclick=function(){zoom(1);};
+  item("csFold",function(){var r=document.body.getAttribute("data-csfold")==="1";document.body.setAttribute("data-csfold",r?"0":"1");
+    this.setAttribute("aria-pressed",r?"false":"true");this.textContent=r?"🔽 Roll the preview up":"🔼 Open the preview";});
+  item("csFloat",function(){csSetView(csView==="float"?"dock":"float");});
+  $("csFull").onclick=function(){csSetView(csView==="full"?"dock":"full");};
+  $("csLineX").onclick=function(){try{localStorage.setItem("ingenium_cs_line","1");}catch(e){}$("csLine").hidden=true;};
+  $("csCopy").onclick=function(){if(csCur)csCopyText(csCur.html,this);};
+  $("csOpen").onclick=function(){if(!csCur)return;try{var u=URL.createObjectURL(new Blob([csCur.html],{type:"text/html"}));window.open(u,"_blank");setTimeout(function(){URL.revokeObjectURL(u);},60000);}catch(e){}};
+  $("csDl").onclick=function(){if(!csCur)return;var base=String(csCur.name||"page").replace(/\.html?$/i,"").replace(/[^\w .-]+/g," ").trim().replace(/\s+/g,"-")||"page";
+    dlMenuShow(this,base,function(){return csCur?csCur.html:"";});};
+  item("csEdit",function(){if(!csCur)return;var h=csCur.html;
+    if(h.length>3*1024*1024){ingToast("This page is "+fmtBytes(h.length)+", too large for the Build editor to stay quick. Download it or open it in its own window instead.");return;}
+    go("build");$("codeEditor").value=h;try{runBuild();}catch(e){}});
+  /* the line between the chat and the stage */
+  var hd=$("csHandle"),dragging=false;
+  hd.addEventListener("pointerdown",function(e){dragging=true;capturePointer(hd,e.pointerId);e.preventDefault();csDragOn();});
+  hd.addEventListener("pointermove",function(e){if(!dragging)return;var r=$("chatCol").getBoundingClientRect();csSetWidth(e.clientX-r.left-6,false);});
+  hd.addEventListener("pointerup",function(e){if(!dragging)return;dragging=false;var r=$("chatCol").getBoundingClientRect();csSetWidth(e.clientX-r.left-6,true);csDragOff();});
+  hd.addEventListener("keydown",function(e){if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;var cw=document.querySelector("#page-chat .chat-card").offsetWidth;
+    csSetWidth(cw+(e.key==="ArrowLeft"?-24:24),true);e.preventDefault();});
+  /* floated: drag by its row, resize by all eight grips; docked, the west grip moves the line */
+  var bar=$("csBar");
+  bar.addEventListener("pointerdown",function(e){if(csView!=="float"||e.target.closest("button")||e.target.closest(".chat-menu"))return;
+    var sx=e.clientX,sy=e.clientY,cs=getComputedStyle(document.body),ox=parseFloat(cs.getPropertyValue("--cs-x"))||60,oy=parseFloat(cs.getPropertyValue("--cs-y"))||60;
+    capturePointer(bar,e.pointerId);e.preventDefault();
+    function mv(e2){document.body.style.setProperty("--cs-x",Math.max(4,ox+(e2.clientX-sx))+"px");document.body.style.setProperty("--cs-y",Math.max(4,oy+(e2.clientY-sy))+"px");}
+    function up(){bar.removeEventListener("pointermove",mv);bar.removeEventListener("pointerup",up);csDragOff();}
+    bar.addEventListener("pointermove",mv);bar.addEventListener("pointerup",up);csDragOn();});
+  document.querySelectorAll("#csPane .fgrip").forEach(function(g){g.addEventListener("pointerdown",function(e){
+    var sm=/fgrip-(ne|nw|se|sw|n|s|e|w)/.exec(g.className),side=sm?sm[1]:"";
+    if(csView!=="float"){
+      if(side==="w"&&csView==="dock"){capturePointer(g,e.pointerId);e.preventDefault();e.stopPropagation();
+        var mvW=function(e2){var r=$("chatCol").getBoundingClientRect();csSetWidth(e2.clientX-r.left-6,false);};
+        var upW=function(e2){g.removeEventListener("pointermove",mvW);g.removeEventListener("pointerup",upW);var r=$("chatCol").getBoundingClientRect();csSetWidth(e2.clientX-r.left-6,true);csDragOff();};
+        g.addEventListener("pointermove",mvW);g.addEventListener("pointerup",upW);csDragOn();return;}
+      if(csView==="full")return;
+      var b=$("csPane").getBoundingClientRect(),bs0=document.body.style;
+      bs0.setProperty("--cs-x",Math.round(b.left)+"px");bs0.setProperty("--cs-y",Math.round(b.top)+"px");
+      bs0.setProperty("--cs-w",Math.round(b.width)+"px");bs0.setProperty("--cs-h",Math.round(b.height)+"px");
+      csView="float";document.body.setAttribute("data-csview","float");$("csFloat").textContent="🪟 Dock";$("csFloat").setAttribute("aria-pressed","true");}
+    var sx=e.clientX,sy=e.clientY,cs=getComputedStyle(document.body);
+    var x=parseFloat(cs.getPropertyValue("--cs-x"))||60,y=parseFloat(cs.getPropertyValue("--cs-y"))||60,w=parseFloat(cs.getPropertyValue("--cs-w"))||640,h=parseFloat(cs.getPropertyValue("--cs-h"))||520;
+    capturePointer(g,e.pointerId);e.preventDefault();e.stopPropagation();
+    function mv(e2){var dx=e2.clientX-sx,dy=e2.clientY-sy,bs=document.body.style;
+      if(side.indexOf("e")>=0)bs.setProperty("--cs-w",Math.max(320,w+dx)+"px");
+      if(side.indexOf("s")>=0)bs.setProperty("--cs-h",Math.max(240,h+dy)+"px");
+      if(side.indexOf("w")>=0){var nw=Math.max(320,w-dx);bs.setProperty("--cs-w",nw+"px");bs.setProperty("--cs-x",(x+w-nw)+"px");}
+      if(side.indexOf("n")>=0){var nh=Math.max(240,h-dy);bs.setProperty("--cs-h",nh+"px");bs.setProperty("--cs-y",(y+h-nh)+"px");}
+      csMeasure();}
+    function up(){g.removeEventListener("pointermove",mv);g.removeEventListener("pointerup",up);csDragOff();}
+    g.addEventListener("pointermove",mv);g.addEventListener("pointerup",up);csDragOn();});});
+  window.addEventListener("resize",function(){if(!csIsOn())return;csMeasure();if(csView==="dock"){var col=$("chatCol"),card=document.querySelector("#page-chat .chat-card");
+    if(col&&card&&card.offsetWidth>col.offsetWidth-352)csApplyWidth();}});
+})();
+/* while a drag lives, a veil covers the frame so it cannot swallow the pointer */
+function csDragOn(){document.body.setAttribute("data-dragging","1");if($("csDragVeil"))return;var v=el("div","pv-dragveil");v.id="csDragVeil";var p=$("csPane");if(p)p.appendChild(v);}
+function csDragOff(){document.body.removeAttribute("data-dragging");var v=$("csDragVeil");if(v)v.remove();}
 if($("cpClose"))$("cpClose").onclick=function(){var pv=$("chatPreview");if(pv)pv.setAttribute("hidden","");};
 if($("cpCopy"))$("cpCopy").onclick=function(){if(!window._chatPreviewHtml)return;
   if(navigator.clipboard)navigator.clipboard.writeText(window._chatPreviewHtml);
@@ -7262,12 +7820,13 @@ $("blendRun").onclick=function(){var chosen=state.models.filter(function(m){retu
 var SAMPLE='<!doctype html>\n<html>\n<head><meta charset="utf-8"><style>\n  body{font-family:system-ui,sans-serif;margin:0;display:grid;place-items:center;height:100vh;\n       background:linear-gradient(135deg,#6a3fb5,#b88a3a);color:#fff}\n  .card{background:rgba(255,255,255,.14);padding:28px 34px;border-radius:16px;text-align:center;\n        backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,.3)}\n  button{margin-top:14px;padding:9px 16px;border:0;border-radius:10px;cursor:pointer;font-weight:600}\n</style></head>\n<body>\n  <div class="card">\n    <h1 id="t">Hello from the preview</h1>\n    <button onclick="count()">Click me</button>\n  </div>\n  <script>\n    let n=0;\n    function count(){ n++; document.getElementById("t").textContent="Clicked "+n+" time"+(n===1?"":"s"); console.log("clicked",n); }\n    console.log("preview loaded");\n  <\/script>\n</body>\n</html>';
 var consoleLines=0;
 function runBuild(){var code=$("codeEditor").value;state.build=code;saveState();$("consolePane").innerHTML="";consoleLines=0;updateConsoleCount();
-  var capture='<script>(function(){function send(l,a){try{parent.postMessage({__fdConsole:1,level:l,text:Array.prototype.map.call(a,function(x){try{return typeof x==="object"?JSON.stringify(x):String(x);}catch(e){return String(x);}}).join(" ")},"*");}catch(e){}}["log","warn","error","info"].forEach(function(k){var o=console[k]?console[k].bind(console):function(){};console[k]=function(){send(k,arguments);o.apply(null,arguments);};});window.addEventListener("error",function(e){send("error",[e.message+" ("+(e.lineno||"?")+")"]);});})();<\/script>';
-  $("previewFrame").srcdoc=capture+code+(window.__ING_CTX_SNIPPET||"");$("frameWrap").setAttribute("data-lived","1");}
+  $("previewFrame").srcdoc=ingStageDoc(code);$("frameWrap").setAttribute("data-lived","1");}
 function pushConsole(level,text){var pane=$("consolePane");var line=el("div",level==="error"?"cerr":(level==="warn"?"cwarn":""));
   line.textContent=(level==="error"?"✕ ":(level==="warn"?"! ":"› "))+text;pane.appendChild(line);pane.scrollTop=pane.scrollHeight;consoleLines++;updateConsoleCount();}
 function updateConsoleCount(){$("consoleCount").textContent=consoleLines?(consoleLines+" console message"+(consoleLines===1?"":"s")):"console";}
-window.addEventListener("message",function(e){var d=e.data;if(d&&d.__fdConsole)pushConsole(d.level,d.text);});
+window.addEventListener("message",function(e){var d=e.data;if(!d)return;
+  if(d.__ingStore){if(csFromStage(e.source))csStoreChange(d);return;}
+  if(!d.__fdConsole)return;if(csFromStage(e.source))csPush(d.level,d.text);else pushConsole(d.level,d.text);});
 var runTimer=null;
 $("codeEditor").addEventListener("input",function(){if(!$("autoRun").checked)return;clearTimeout(runTimer);runTimer=setTimeout(runBuild,500);});
 $("runBtn").onclick=runBuild;$("sampleBtn").onclick=function(){$("codeEditor").value=SAMPLE;runBuild();};
@@ -7680,7 +8239,7 @@ function pdragOff(){document.body.removeAttribute("data-dragging");
     bar.addEventListener("pointermove",mv);bar.addEventListener("pointerup",up);pdragOn();});
   document.querySelectorAll("#previewPane .fgrip").forEach(function(g){
     g.addEventListener("pointerdown",function(e){
-      var sideM=/fgrip-(n|s|e|w|ne|nw|se|sw)/.exec(g.className);var side=sideM?sideM[1]:"";
+      var sideM=/fgrip-(ne|nw|se|sw|n|s|e|w)/.exec(g.className);var side=sideM?sideM[1]:"";
       /* In dock mode: the west grip resizes the editor/stage split (like the handle).
          Any other grip lifts the stage into float mode and resizes from there. */
       if(buildView!=="float"){
@@ -9579,7 +10138,9 @@ function supInit(){state.support=state.support||{};state.parked=state.parked||[]
   setTimeout(function wait(){var door=$("introDoor");if(door&&!door.hasAttribute("hidden")){setTimeout(wait,1500);return;}
     if($("modalRoot").classList.contains("open")){setTimeout(wait,3000);return;}
     if(seenBefore&&Date.now()-seenBefore>=20*60000)supResume();},2500);}
-function supCopy(text,btn){function ok(){if(btn){var o=btn.textContent;btn.textContent="Copied";setTimeout(function(){btn.textContent=o;},1400);}}
+function supCopy(text,btn){function ok(){if(btn){var o=btn.textContent;if(o==="Copied")return;btn.textContent="Copied";setTimeout(function(){btn.textContent=o;},1400);}}
+  /* R83: through the app's own clipboard first, so it reaches every other app */
+  try{if(typeof ingClipWrite==="function"){ingClipWrite(text).then(ok,function(){fall();});return;}}catch(e){}
   try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(ok,function(){fall();});return;}}catch(e){}
   fall();function fall(){try{var t=el("textarea");t.value=text;t.style.cssText="position:fixed;left:-9999px";document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();ok();}catch(e){}}}
 
@@ -9924,7 +10485,7 @@ function ingUncheckedNote(kinds){if(!kinds||!kinds.length)return "";
   var list=kinds.length===1?kinds[0]:kinds.slice(0,-1).join(", ")+" and "+kinds[kinds.length-1];
   return "Unchecked: this reply names "+list+" that did not come from your messages, your files or a web search. Models on this device sometimes invent such details, so check each one before you rely on it.";}
 function ingChatContextText(bot){var parts=[];
-  curMsgs().forEach(function(x){if(x.role==="me"){parts.push(x.text||"",x.attach||"",x.webCtx||"",x.passages||"");}});
+  curMsgs().forEach(function(x){if(x.role==="me"){parts.push(x.text||"",msgAttach(x),x.webCtx||"",x.passages||"");}});
   try{var pr=chatProject();if(pr){parts.push(pr.instructions||"");(pr.files||[]).forEach(function(f){if(f&&f.text)parts.push(f.text);});}}catch(e){}
   if(bot&&bot.sources)bot.sources.forEach(function(x){parts.push(x.url||"",x.title||"");});
   return parts.join("\n");}
@@ -11531,7 +12092,7 @@ function openGitHub(){var gh=state.github||{};
   function saveTok(){state.github=state.github||{};state.github.token=box.querySelector("#ghTok").value.trim();saveState();}
   function addFiles(items,p){var chain=Promise.resolve(),n=0,bad=[];
     items.forEach(function(it){chain=chain.then(function(){note.textContent="Fetching "+it.path+"…";
-      return ghFile({o:p.o,r:p.r,ref:p.ref,path:it.path}).then(function(t){var cut=t.length>FILE_MAX_CHARS;stagedFiles.push({name:p.r+"/"+it.path,text:cut?t.slice(0,FILE_MAX_CHARS):t,cut:cut});n++;},function(e){bad.push(it.path+" ("+e.message+")");});});});
+      return ghFile({o:p.o,r:p.r,ref:p.ref,path:it.path}).then(function(t){stageText(p.r+"/"+it.path,t,false);n++;},function(e){bad.push(it.path+" ("+e.message+")");});});});
     return chain.then(function(){paintChips();if(n){closeModal();ingToast(n+" file"+(n===1?"":"s")+" from GitHub will go with your next message."+(bad.length?" Not fetched: "+bad.join(", "):""));}
       else note.textContent="Nothing was fetched. "+bad.join("; ");});}
   go.onclick=function(){saveTok();
@@ -12045,6 +12606,8 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
   function tell(ev){ try{ target.dispatchEvent(new Event('input',{bubbles:true})); target.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
   function insertText(txt){
     if(!target||txt==null) return;
+    /* R81: Ingenium's composer takes a long paste as a file chip */
+    try{ if(window.__ingBigPaste&&window.__ingBigPaste(target,txt)) return; }catch(e){}
     if(target.tagName==='TEXTAREA'||target.tagName==='INPUT'){
       target.focus();
       var s=(typeof target.selectionStart==='number')?target.selectionStart:target.value.length;
@@ -12174,6 +12737,7 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     }
     return null;
   }
+  function msgAt(t){ try{ return window.__ingMsgAt?window.__ingMsgAt(t):null; }catch(e){ return null; } }
   function hasSel(){ try{ var s=window.getSelection(); return !!(s && !s.isCollapsed && String(s).length); }catch(e){ return false; } }
   var emSuppressUntil=0;
   /* Structural chrome by hand: position, layering, paper and ink exist even
@@ -12222,6 +12786,26 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     document.body.appendChild(menu);
     chromeMenu(); placeMenu(x,y);
   }
+  /* R83: a press on a chat message offers the whole message too */
+  function openMsg(x,y,t,mt){
+    close(); target=t;
+    menu=document.createElement('div'); menu.id='cd-em-menu'; menu.setAttribute('role','menu');
+    var rows=[
+      {label:'Copy', hint:key('C'), needSel:true, act:function(){ var tx=''; try{ tx=String(window.getSelection()||''); }catch(e){} if(tx) copyText(tx); }},
+      {label:'Copy the whole message', act:function(){ try{ mt.text().then(function(tx){ copyText(String(tx||'')); }); }catch(e){} }},
+      {label:'Select the whole message', act:function(){ try{ var r=document.createRange(); r.selectNodeContents(mt.node); var s=window.getSelection(); s.removeAllRanges(); s.addRange(r);}catch(e){} }}
+    ];
+    rows.forEach(function(it){
+      var b=document.createElement('button'); b.type='button'; b.className='cd-em-row';
+      var lab=document.createElement('span'); lab.textContent=it.label; b.appendChild(lab);
+      if(it.hint){ var h=document.createElement('span'); h.className='cd-em-hint'; h.textContent=it.hint; b.appendChild(h); }
+      if(it.needSel && !hasSel()) b.setAttribute('aria-disabled','true');
+      b.onclick=function(){ if(b.getAttribute('aria-disabled')==='true') return; try{ it.act(); }catch(e){} close(); };
+      menu.appendChild(b);
+    });
+    document.body.appendChild(menu);
+    chromeMenu(); placeMenu(x,y);
+  }
   function openSafe(x,y,t){
     try{ open(x,y,t); chromeMenu(); placeMenu(x,y); }
     catch(err){ try{ openSel(x,y,t); }catch(e2){} }
@@ -12233,6 +12817,8 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     try{ docEl=document.elementFromPoint(x,y); }catch(e){}
     var f=fieldOf(src)||fieldOf(docEl);
     if(f){ openSafe(x,y,f); return true; }
+    var mt=null; try{ if(window.__ingMsgAt) mt=window.__ingMsgAt(src)||window.__ingMsgAt(docEl); }catch(e){}
+    if(mt){ openMsg(x,y,src,mt); return true; }
     if(hasSel()){ openSel(x,y,src); return true; }
     close(); return false;
   }
@@ -12246,11 +12832,11 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     window.__ingEmSeen.contextmenu++;
     if(Date.now()<emSuppressUntil){ e.preventDefault(); e.stopPropagation(); return; }
     var t=e.target;
-    var f=fieldOf(t);
-    if(!f && !hasSel()){ close(); return; }
+    var f=fieldOf(t), mt=f?null:msgAt(t);
+    if(!f && !mt && !hasSel()){ close(); return; }
     e.preventDefault(); e.stopPropagation();
     emSuppressUntil=Date.now()+400;
-    if(f) openSafe(e.clientX, e.clientY, f); else openSel(e.clientX, e.clientY, t);
+    if(f) openSafe(e.clientX, e.clientY, f); else if(mt) openMsg(e.clientX, e.clientY, t, mt); else openSel(e.clientX, e.clientY, t);
   }, true);
   function secondaryPress(e){
     /* button 2 is the right button; button 0 with ctrl is the Mac's
@@ -12261,7 +12847,7 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     if(!secondaryPress(e)) return;
     window.__ingEmSeen.pointerdown++;
     var f=fieldOf(e.target);
-    if(!f && !hasSel()) return;
+    if(!f && !hasSel() && !msgAt(e.target)) return;
     if(Date.now()<emSuppressUntil) return;
     if(answerRightPress(e.clientX,e.clientY,e.target)) e.preventDefault();
   }, true);
@@ -12269,7 +12855,7 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     if(!secondaryPress(e)) return;
     window.__ingEmSeen.mousedown++;
     var f=fieldOf(e.target);
-    if(!f && !hasSel()) return;
+    if(!f && !hasSel() && !msgAt(e.target)) return;
     if(Date.now()<emSuppressUntil) return;
     if(answerRightPress(e.clientX,e.clientY,e.target)) e.preventDefault();
   }, true);
@@ -12278,7 +12864,7 @@ body[data-theme="night"] #cd-em-menu .cd-em-row:hover{
     window.__ingEmSeen.auxclick++;
     if(Date.now()<emSuppressUntil) return;
     var f=fieldOf(e.target);
-    if(!f && !hasSel()) return;
+    if(!f && !hasSel() && !msgAt(e.target)) return;
     if(answerRightPress(e.clientX,e.clientY,e.target)) e.preventDefault();
   }, true);
   /* the Forge's pass cd-737: on editable ground, stop the press from reaching
