@@ -4966,7 +4966,7 @@ function applyTheme(){document.body.setAttribute("data-theme",resolvedTheme());d
   document.body.setAttribute("data-depth",state.depth||"raised");
   document.body.setAttribute("data-nav",state.nav||"side");
   document.body.setAttribute("data-frame",state.frame||"on");
-  paintThemeControls();ingTellAppearance();}
+  paintThemeControls();ingTellAppearance();try{ingSyncIcons();}catch(e){}}
 /* R68: the phone and tablet apps colour their status bar and edges like the
    page (dark text by day, light at night), so the app shows no seam */
 var _appearT=0;
@@ -9348,7 +9348,7 @@ document.addEventListener("click",function(e){var pnl=$("displayPanel");if(!pnl|
    number into the page they put in each app (tools/app_page.py --build, and
    the Mac and Windows workflows); a page that was not stamped (a browser, a
    build made on the computer itself) shows the date its page was written. */
-var ING_VERSION="3.2",ING_PAGE_DATE="10 October 2026";
+var ING_VERSION="3.3",ING_PAGE_DATE="12 October 2026";
 /* ============ R70: Ingenium's own models, in its houses ============
    Each kind of device gets a lineup chosen for it, the way Claude offers a
    faster and a stronger model: Velox answers fastest, Scriba thinks before it
@@ -11790,6 +11790,7 @@ document.addEventListener("click",function(e){
 
 /* ============ THE SEAL, DRAWN: one file carries its own icon ============ */
 function drawIngeniumSeal(cv,opts){
+ /* R84: opts.night draws the seal as the door shows it by night (the s4 night colours) */
   /* R71: the raised seal, as the door shows it by day, for the browser's icon
      and the web kit's icons: the face and its bevelled rim with the glint at
      the upper left, the hairline ring, the star cut into lit and shaded
@@ -11807,47 +11808,57 @@ function drawIngeniumSeal(cv,opts){
   function shadow(c,blur,dx,dy){ctx.shadowColor=c;ctx.shadowBlur=blur*u;ctx.shadowOffsetX=dx*u;ctx.shadowOffsetY=dy*u;}
   function noShadow(){ctx.shadowColor="rgba(0,0,0,0)";ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;}
   /* the disc and the shadow it casts on what lies below */
-  var face=lin(3.8,3.8,116.2,116.2,[[0,"#ffffff"],[1,"#efe8f8"]]);
+  var NT=!!(opts&&opts.night);
+  var face=lin(3.8,3.8,116.2,116.2,[[0,(NT?"#372d4d":"#ffffff")],[1,(NT?"#1a1524":"#efe8f8")]]);
   ctx.beginPath();ctx.arc(60,60,56.7,0,Math.PI*2);ctx.fillStyle=face;
   /* R77: a short, close, neutral shadow, as the app icons have; no purple halo */
-  shadow("rgba(28,22,40,.12)",5,0,2.2);ctx.fill();shadow("rgba(28,22,40,.13)",1.2,0,1);ctx.fill();noShadow();
+  shadow((NT?"rgba(0,0,0,.45)":"rgba(28,22,40,.12)"),5,0,2.2);ctx.fill();shadow((NT?"rgba(0,0,0,.5)":"rgba(28,22,40,.13)"),1.2,0,1);ctx.fill();noShadow();
   var gl=ctx.createRadialGradient(60,60,0,60,60,58.3);gl.addColorStop(0,"rgba(196,176,238,.22)");gl.addColorStop(1,"rgba(196,176,238,0)");
   ctx.beginPath();ctx.arc(60,60,53,0,Math.PI*2);ctx.fillStyle=gl;ctx.fill();
-  ring(54.5,1.4,lin(5.5,5.5,114.5,114.5,[[0,"rgba(59,32,102,.14)"],[.38,"rgba(59,32,102,0)"],[.62,"rgba(255,255,255,0)"],[1,"rgba(255,255,255,.7)"]]));
-  ring(56,1.4,lin(4,4,116,116,[[0,"#b39bea"],[.5,"#6a3fb5"],[1,"#472b7f"]]));
+  ring(54.5,1.4,lin(5.5,5.5,114.5,114.5,[[0,(NT?"rgba(0,0,0,.35)":"rgba(59,32,102,.14)")],[.38,(NT?"rgba(0,0,0,0)":"rgba(59,32,102,0)")],[.62,(NT?"rgba(205,184,240,0)":"rgba(255,255,255,0)")],[1,(NT?"rgba(205,184,240,.45)":"rgba(255,255,255,.7)")]]));
+  ring(56,1.4,lin(4,4,116,116,[[0,(NT?"#e2d5fa":"#b39bea")],[.5,(NT?"#9a7ad8":"#6a3fb5")],[1,(NT?"#3d2572":"#472b7f")]]));
   ring(56.5,0.7,lin(3.5,3.5,116.5,116.5,[[0,"rgba(255,255,255,.95)"],[.42,"rgba(255,255,255,0)"]]));
-  ring(50,1.2,lin(10,60,110,60,[[0,"rgba(106,63,181,.55)"],[.55,"rgba(106,63,181,.55)"],[1,"rgba(106,63,181,.08)"]]));
+  ring(50,1.2,lin(10,60,110,60,[[0,(NT?"rgba(183,156,230,.55)":"rgba(106,63,181,.55)")],[.55,(NT?"rgba(183,156,230,.55)":"rgba(106,63,181,.55)")],[1,(NT?"rgba(183,156,230,.08)":"rgba(106,63,181,.08)")]]));
   /* a raised part: its shadow, its own paint, then the lit and shaded edges */
   function raised(path,paint){
-    ctx.fillStyle="#7853c3";shadow("rgba(42,20,80,.30)",2.6,0.8,1.9);ctx.fill(path);noShadow();
+    ctx.fillStyle=(NT?"#8360cf":"#7853c3");shadow((NT?"rgba(0,0,0,.55)":"rgba(42,20,80,.30)"),2.6,0.8,1.9);ctx.fill(path);noShadow();
     paint();
     ctx.save();ctx.clip(path);
-    [[0.8,0.9,"rgba(255,255,255,.42)"],[-0.8,-0.9,"rgba(36,16,74,.30)"]].forEach(function(e){
+    [[0.8,0.9,(NT?"rgba(255,255,255,.5)":"rgba(255,255,255,.42)")],[-0.8,-0.9,(NT?"rgba(18,8,38,.35)":"rgba(36,16,74,.30)")]].forEach(function(e){
       var p=new Path2D();p.rect(-10,-10,140,140);p.addPath(path,new DOMMatrix().translate(e[0],e[1]));
       ctx.fillStyle=e[2];ctx.fill(p,"evenodd");});
     ctx.restore();}
   var star=new Path2D("M60 30 C63.5 45, 75 56.5, 90 60 C75 63.5, 63.5 75, 60 90 C56.5 75, 45 63.5, 30 60 C45 56.5, 56.5 45, 60 30 Z");
   var lit=new Path2D("M60 60 L60 30 C58.25 37.5, 54.5 44.125, 49.31 49.31 Z"),shade=new Path2D("M60 60 L60 30 C61.75 37.5, 65.5 44.125, 70.69 49.31 Z");
   raised(star,function(){for(var k=0;k<4;k++){ctx.save();ctx.translate(60,60);ctx.rotate(k*Math.PI/2);ctx.translate(-60,-60);
-    ctx.fillStyle="#9275d8";ctx.fill(lit);ctx.fillStyle="#7853c3";ctx.fill(shade);ctx.restore();}});
+    ctx.fillStyle=(NT?"#a68ce6":"#9275d8");ctx.fill(lit);ctx.fillStyle=(NT?"#8360cf":"#7853c3");ctx.fill(shade);ctx.restore();}});
   var stone=new Path2D();stone.arc(60,60,9,0,Math.PI*2);
   raised(stone,function(){
-    var g=ctx.createRadialGradient(57.48,56.76,0,57.48,56.76,13.5);g.addColorStop(0,"#8f68d8");g.addColorStop(1,"#4b2a86");
+    var g=ctx.createRadialGradient(57.48,56.76,0,57.48,56.76,13.5);g.addColorStop(0,(NT?"#9f7ae6":"#8f68d8"));g.addColorStop(1,"#4b2a86");
     ctx.fillStyle=g;ctx.fill(stone);
-    var q=ctx.createRadialGradient(58.75,58.34,0,58.75,58.34,7.49);q.addColorStop(0,"#ffffff");q.addColorStop(1,"#dccff4");
+    var q=ctx.createRadialGradient(58.75,58.34,0,58.75,58.34,7.49);q.addColorStop(0,(NT?"#e4d9f8":"#ffffff"));q.addColorStop(1,(NT?"#cdb8f0":"#dccff4"));
     ctx.beginPath();ctx.arc(60,60,5.2,0,Math.PI*2);ctx.fillStyle=q;ctx.fill();
     ctx.beginPath();ctx.arc(58.28,58.18,1.25,0,Math.PI*2);ctx.fillStyle="rgba(255,255,255,.9)";ctx.fill();});
   ctx.restore();}
+/* R84: the icon is the night seal whenever Ingenium or the device is dark */
+var _ingIcons=null,_ingIconShown=null;
+function ingIconsDark(){var d=false;try{d=resolvedTheme()==="night";}catch(e){}
+  try{if(!d&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)d=true;}catch(e){}return d;}
+function ingSyncIcons(){try{
+  if(!_ingIcons){_ingIcons={};[["day",false],["night",true]].forEach(function(p){
+      var a=document.createElement("canvas");a.width=64;a.height=64;drawIngeniumSeal(a,{night:p[1]});
+      var b=document.createElement("canvas");b.width=180;b.height=180;drawIngeniumSeal(b,{night:p[1]});
+      _ingIcons[p[0]]={fav:a.toDataURL("image/png"),touch:b.toDataURL("image/png")};});}
+  var k=ingIconsDark()?"night":"day";if(k===_ingIconShown)return;_ingIconShown=k;
+  [["icon",_ingIcons[k].fav,"image/png"],["apple-touch-icon",_ingIcons[k].touch,""]].forEach(function(q){
+    /* put in afresh: a browser does not always read an icon again that changed in place */
+    var old=document.querySelectorAll('link[rel="'+q[0]+'"]');for(var i=0;i<old.length;i++){try{old[i].parentNode.removeChild(old[i]);}catch(e){}}
+    var l=document.createElement("link");l.rel=q[0];if(q[2])l.type=q[2];l.href=q[1];document.head.appendChild(l);});
+}catch(e){}}
 function setupIcons(){
-  try{
-    var favc=document.createElement("canvas");favc.width=64;favc.height=64;drawIngeniumSeal(favc);
-    var fav=document.querySelector('link[rel="icon"]')||document.createElement("link");
-    fav.rel="icon";fav.type="image/png";fav.href=favc.toDataURL("image/png");
-    if(!fav.parentNode)document.head.appendChild(fav);
-    var tc=document.createElement("canvas");tc.width=180;tc.height=180;drawIngeniumSeal(tc);
-    var at=document.querySelector('link[rel="apple-touch-icon"]')||document.createElement("link");
-    at.rel="apple-touch-icon";at.href=tc.toDataURL("image/png");
-    if(!at.parentNode)document.head.appendChild(at);
+  try{ingSyncIcons();
+    if(window.matchMedia){var mq=window.matchMedia("(prefers-color-scheme: dark)");var f=function(){ingSyncIcons();};
+      if(mq.addEventListener)mq.addEventListener("change",f);else if(mq.addListener)mq.addListener(f);}
   }catch(e){}}
 
 /* init */

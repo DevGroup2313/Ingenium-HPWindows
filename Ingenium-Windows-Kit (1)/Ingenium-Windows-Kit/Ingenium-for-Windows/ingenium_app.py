@@ -3863,6 +3863,28 @@ def _start_monitor_thread(window):
 
 import pathlib
 
+
+def show_seal_in_dock(picture):
+    """macOS 26 sets an app's own icon in a grey square when it is not Apple's rounded square, and shrinks it.
+    While the app runs, the Dock shows the picture the app gives it, so the round seal is given here, at its full size.
+    Anywhere else (Windows, an older Mac) nothing changes."""
+    if sys.platform != "darwin":
+        return
+    try:
+        pic = resource_path(picture)
+        if not os.path.isfile(pic):
+            return
+        from AppKit import NSApplication, NSImage
+        img = NSImage.alloc().initWithContentsOfFile_(pic)
+        if img is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(img)
+    except Exception:
+        try:
+            log_problem("dock seal", sys.exc_info())
+        except Exception:
+            pass
+
+
 def main():
     global _APP_HTML_PATH
     app_html = find_app_html()
@@ -4111,6 +4133,7 @@ def main():
     # unpack directory. pywebview versions differ on which keywords they
     # accept, so each richer attempt degrades to the plainer one, and only a
     # genuine start failure reports anything.
+    show_seal_in_dock('ingenium.png')
     _start_monitor_thread(window)
     _store = storage_dir()
     _started = False
