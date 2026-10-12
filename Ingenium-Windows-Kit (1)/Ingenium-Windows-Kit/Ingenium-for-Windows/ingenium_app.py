@@ -51,16 +51,32 @@ import urllib.request
 # frozen app cannot see the system Python's certificate file, so certifi's own
 # copy is bundled by the spec and pointed at here. urllib reads SSL_CERT_FILE
 # when building its default SSL context.
-try:
-    import certifi as _certifi
-    _CERT_FILE = _certifi.where()
-    if _CERT_FILE and os.path.isfile(_CERT_FILE):
-        os.environ.setdefault("SSL_CERT_FILE", _CERT_FILE)
-        os.environ.setdefault("REQUESTS_CA_BUNDLE", _CERT_FILE)
-    else:
-        _CERT_FILE = None
-except Exception:
-    _CERT_FILE = None
+# R84: an app built without certifi used to fall back on the certificate
+# folder its Python was compiled to look in, which exists on some Macs (one
+# with Homebrew, say) and not on others. There every download from Hugging
+# Face was refused, which is why Velox would not install on a Mac mini while
+# it did on another Mac. Without certifi, the system's own bundle is used
+# (macOS keeps one at /etc/ssl/cert.pem); Windows reads its own store.
+def _find_cert_file():
+    try:
+        import certifi as _certifi
+        p = _certifi.where()
+        if p and os.path.isfile(p):
+            return p
+    except Exception:
+        pass
+    if not sys.platform.startswith("win"):
+        for p in ("/etc/ssl/cert.pem", "/private/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt",
+                  "/etc/pki/tls/certs/ca-bundle.crt"):
+            if os.path.isfile(p):
+                return p
+    return None
+
+
+_CERT_FILE = _find_cert_file()
+if _CERT_FILE:
+    os.environ.setdefault("SSL_CERT_FILE", _CERT_FILE)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", _CERT_FILE)
 
 # R65: who this app is. app.json (the same file the phone and tablet builds
 # read) names the app; Ingenium's builder writes a new one for each new app,
@@ -2406,6 +2422,35 @@ class _InstallStopped(Exception):
     pass
 
 
+def _is_cert_error(e):
+    r = getattr(e, "reason", None)
+    return "certificate" in str(r if r is not None else e).lower()
+
+
+def _curl_fetch(url, part, job, say, exe="/usr/bin/curl"):
+    """R84: the Mac's own curl, which trusts the system's certificates,
+    carries a download that Python's own check refused. It carries on from
+    where the part file stops; the caller checks the fingerprint after."""
+    if not os.path.isfile(exe):
+        return False
+    args = [exe, "-L", "--fail", "--silent", "--show-error", "--retry", "3", "-A", "Ingenium",
+            "-C", "-", "-o", str(part), url]
+    p = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    while p.poll() is None:
+        if job["stop"].is_set():
+            p.kill()
+            raise _InstallStopped()
+        try:
+            say(received=os.path.getsize(str(part)), phase="download")
+        except Exception:
+            pass
+        time.sleep(0.4)
+    err = (p.stderr.read() if p.stderr else b"").decode("utf-8", "replace").strip()
+    if p.returncode != 0:
+        raise RuntimeError("the download stopped (%s)" % (err[-240:] or ("curl gave %d" % p.returncode)))
+    return True
+
+
 def _install_worker(job, sp):
     def say(**kw):
         with _INSTALLS_LOCK:
@@ -2448,6 +2493,7 @@ def _install_worker(job, sp):
                 h = hashlib.sha256()
         ctx = ssl.create_default_context(cafile=_CERT_FILE) if _CERT_FILE else ssl.create_default_context()
         last_err = ""
+        cert_fail = False
         for attempt in range(1, 7):
             if have >= sp["size"]:
                 break
@@ -2492,9 +2538,27 @@ def _install_worker(job, sp):
                     break
             except Exception as e:
                 last_err = _relay_reason(e) if "_relay_reason" in globals() else str(e)
+                if _is_cert_error(e):
+                    cert_fail = True
+                    break
             if have < sp["size"]:
                 if job["stop"].wait(min(16, 2 ** attempt)):
                     raise _InstallStopped()
+        if cert_fail and have < sp["size"] and sys.platform == "darwin":
+            log_problem("install of %s: Python refused the certificate (%s); the Mac's own curl carries it"
+                        % (sp.get("key"), last_err))
+            if _curl_fetch(sp["url"], part, job, say):
+                have = part.stat().st_size if part.is_file() else 0
+                say(phase="verify", received=have)
+                h = hashlib.sha256()
+                with open(str(part), "rb") as fh:
+                    while True:
+                        chunk = fh.read(4 << 20)
+                        if not chunk:
+                            break
+                        h.update(chunk)
+                        if job["stop"].is_set():
+                            raise _InstallStopped()
         if have != sp["size"]:
             raise RuntimeError("the download stopped part way (%s). Install again to carry on from where it stopped."
                                % (last_err or "no reason given"))
