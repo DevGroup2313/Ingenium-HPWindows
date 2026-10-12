@@ -1895,11 +1895,18 @@ body.cs-on .cs-pane{display:flex; flex:1 1 auto; min-width:340px; padding:10px 1
 .cs-bar{flex-wrap:nowrap !important; gap:6px; padding:0 0 8px}
 .cs-bar > *{flex:0 0 auto}
 .cs-bar .cs-name{flex:1 1 auto; min-width:0; text-align:left; padding:0 4px}
-.cs-key{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px; box-sizing:border-box;
-  border:1px solid var(--hairline); border-radius:999px; background:var(--card); color:var(--ink-2);
-  font:600 11.5px/1 var(--sans); cursor:pointer; white-space:nowrap; transition:background .12s ease, color .12s ease}
-.cs-key:hover{background:var(--accent-softer); color:var(--accent)}
-.cs-key[aria-pressed="true"], .cs-key[aria-expanded="true"]{background:var(--accent-soft); color:var(--accent-deep); box-shadow:inset 0 2px 5px rgba(40,20,70,.16)}
+.cs-bar .cs-key{display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px; box-sizing:border-box;
+  border:1px solid var(--hairline); border-radius:999px; color:var(--ink-2);
+  font:600 11.5px/1 var(--sans); cursor:pointer; white-space:nowrap}
+/* every key of the stage is one of Ingenium's own: a matte face, a crisp edge, a dark edge beneath and soft casts;
+   it springs up under the pointer and seats when pressed (R79's family keys) */
+.cs-key{position:relative; background:linear-gradient(180deg,var(--card-hi),var(--card-lo)); box-shadow:var(--pop);
+  transition:transform .1s var(--spring,cubic-bezier(.34,1.35,.64,1)), box-shadow .12s ease, background-color .15s ease, color .15s ease, border-color .15s ease}
+.cs-key::before{content:""; position:absolute; left:0; right:0; bottom:0; height:0; pointer-events:none}
+.cs-key:hover{transform:translateY(-2px); box-shadow:var(--pop-hi); color:var(--accent)}
+.cs-key:hover::before{bottom:-3px; height:3px; pointer-events:auto}
+.cs-key:active{transform:translateY(1px); box-shadow:var(--seat)}
+.cs-key[aria-pressed="true"], .cs-key[aria-expanded="true"]{background:var(--accent-soft); color:var(--accent-deep); transform:none; box-shadow:var(--seat)}
 body[data-theme="night"] .cs-key[aria-pressed="true"], body[data-theme="night"] .cs-key[aria-expanded="true"]{color:var(--accent-bright)}
 .cs-key:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 .cs-chev{font-size:10px; opacity:.7; transition:transform .16s ease}
@@ -1908,8 +1915,23 @@ body[data-theme="night"] .cs-key[aria-pressed="true"], body[data-theme="night"] 
 body[data-cschat="hidden"] #csShowChat{display:inline-flex}
 .cs-more-wrap{position:relative; display:inline-flex}
 .cs-menu{min-width:250px; z-index:640}
-.cs-menu .menu-btn{display:flex; align-items:center; gap:8px}
-.cs-menu .menu-btn[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent-deep); font-weight:700}
+/* the stage's More: raised rows that pop in one after another, as the note menu's rows do */
+.cs-menu .menu-btn{display:flex; align-items:center; gap:8px; margin-top:5px; border:1px solid var(--hairline);
+  background:linear-gradient(180deg,var(--card-hi),var(--card-lo)); box-shadow:var(--pop);
+  transition:transform .09s cubic-bezier(.34,1.3,.64,1), box-shadow .09s ease, background .14s ease, color .14s ease;
+  animation:snRowIn .24s cubic-bezier(.2,.9,.3,1.25) backwards}
+/* an entrance that held its last frame ("both") kept the row from lifting under the pointer; holding only the first
+   frame, before each row's turn, lets the lift work once the row is in. The note menu's rows had the same catch. */
+.sn-menu .menu-btn{animation-fill-mode:backwards}
+.cs-menu .menu-btn:nth-of-type(2){animation-delay:.03s} .cs-menu .menu-btn:nth-of-type(3){animation-delay:.06s}
+.cs-menu .menu-btn:nth-of-type(4){animation-delay:.09s} .cs-menu .menu-btn:nth-of-type(5){animation-delay:.12s}
+.cs-menu .menu-btn:nth-of-type(6){animation-delay:.15s} .cs-menu .menu-btn:nth-of-type(7){animation-delay:.18s}
+.cs-menu .menu-btn:hover{transform:translateY(-2px); box-shadow:var(--pop-hi); background:linear-gradient(180deg,var(--card-hi),var(--card-lo)); color:var(--accent-deep)}
+body[data-theme="night"] .cs-menu .menu-btn:hover{color:var(--accent-bright)}
+.cs-menu .menu-btn:active{transform:translateY(1px); transition-duration:.04s; box-shadow:var(--seat)}
+.cs-menu .menu-btn[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent-deep); font-weight:700; box-shadow:var(--seat)}
+body[data-motion="minimal"] .cs-menu .menu-btn{animation:none}
+body[data-motion="minimal"] .cs-menu .menu-btn:hover, body[data-motion="minimal"] .cs-key:hover{transform:none}
 .cs-menu .ctx-hint{margin-left:auto; font-size:10.5px; color:var(--ink-3); font-weight:400}
 /* a narrower stage: first the zoom keys shorten, then the name gives way */
 .cs-bar[data-w~="n1"] #csZoomOut, .cs-bar[data-w~="n1"] #csZoomIn{font-size:0; width:28px; padding:0; justify-content:center}
@@ -1921,11 +1943,17 @@ body[data-cschat="hidden"] #csShowChat{display:inline-flex}
 .cs-line{margin:-2px 2px 8px; font:italic 12.5px/1.45 Georgia, "Times New Roman", serif; color:var(--accent-deep)}
 body[data-theme="night"] .cs-line{color:var(--accent-bright)}
 .cs-line[hidden]{display:none}
-.cs-line-x{border:0; background:transparent; color:var(--ink-3); cursor:pointer; font-size:12px; padding:0 4px}
-.cs-line-x:hover{color:var(--accent)}
+.cs-line-x{display:inline-grid; place-items:center; width:20px; height:20px; margin-left:4px; padding:0; vertical-align:1px;
+  border:1px solid var(--hairline); border-radius:50%; background:linear-gradient(180deg,var(--card-hi),var(--card-lo)); box-shadow:var(--pop);
+  color:var(--ink-3); cursor:pointer; font:600 11px/1 var(--sans); font-style:normal;
+  transition:transform .1s var(--spring,cubic-bezier(.34,1.35,.64,1)), box-shadow .12s ease, color .12s ease}
+.cs-line-x:hover{color:var(--accent); transform:translateY(-2px); box-shadow:var(--pop-hi)}
+.cs-line-x:active{transform:translateY(1px); box-shadow:var(--seat)}
 /* the page, its code, its changes */
 .cs-pane .pv-frame-wrap{min-height:200px}
 #csFrame{flex:1; width:100%; height:100%; border:0; display:block; background:transparent}
+/* a running page sits on white, as in the Forge's preview and in a browser: a page with no colour of its own shows on white */
+.pv-frame-wrap[data-lived="1"] #csFrame{background:#fff}
 .cs-code, .cs-changes{position:absolute; top:0;right:0;bottom:0;left:0; margin:0; padding:14px; overflow:auto; background:var(--card); color:var(--ink-1)}
 .cs-code{font:12.5px/1.6 var(--mono); white-space:pre-wrap; overflow-wrap:anywhere}
 .cs-code[hidden], .cs-changes[hidden]{display:none}
@@ -1993,11 +2021,16 @@ body.cs-on.chat-drawer-on #page-chat .chat-card{min-width:280px}
 .cs-card.live .cs-card-ico{animation:csPulse 1.4s ease-in-out infinite}
 @keyframes csPulse{50%{opacity:.45}}
 body[data-motion="minimal"] .cs-card.live .cs-card-ico{animation:none}
-@media (prefers-reduced-motion: reduce){.cs-card.live .cs-card-ico{animation:none}.cs-card, .cs-key{transition:none}}
+@media (prefers-reduced-motion: reduce){.cs-card.live .cs-card-ico{animation:none}.cs-card, .cs-key, .cs-line-x, .cs-menu .menu-btn, button.msg-file{transition:none; animation:none}
+  .cs-card:hover, .cs-key:hover, .cs-line-x:hover, .cs-menu .menu-btn:hover, button.msg-file:hover{transform:none}}
 body[data-theme="night"] .cs-card{background:linear-gradient(180deg,rgba(43,35,53,.9),rgba(28,22,36,.9)); border-color:rgba(183,156,230,.4)}
 body[data-theme="night"] .cs-card-ico{color:var(--accent-bright)}
-button.msg-file{border:1px solid currentColor; border-radius:999px; background:transparent; color:inherit; font:inherit; cursor:pointer; padding:1px 9px}
-button.msg-file:hover{background:var(--accent-softer)}
+button.msg-file{border:1px solid var(--hairline); border-radius:999px; background:linear-gradient(180deg,var(--card-hi),var(--card-lo)); color:var(--accent-deep);
+  font:inherit; font-weight:600; cursor:pointer; padding:1px 10px; margin:2px 0 4px; box-shadow:var(--pop);
+  transition:transform .1s var(--spring,cubic-bezier(.34,1.35,.64,1)), box-shadow .12s ease}
+button.msg-file:hover{transform:translateY(-2px); box-shadow:var(--pop-hi)}
+button.msg-file:active{transform:translateY(1px); box-shadow:var(--seat)}
+body[data-theme="night"] button.msg-file{color:var(--accent-bright)}
 .cchip.pv{cursor:pointer}
 .cs-key .nm{font-weight:600}
 #csShow[hidden]{display:none !important}
