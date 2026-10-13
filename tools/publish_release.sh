@@ -19,9 +19,15 @@ TITLE="$APP for $PLATFORM (latest build)"
 NOTES_FILE="${RUNNER_TEMP:-/tmp}/notes.md"
 
 git tag -f "$TAG" "$GITHUB_SHA"
-git push -f origin "refs/tags/$TAG" || echo "(the tag could not be moved; the files are still replaced)"
-gh release view "$TAG" > /dev/null 2>&1 || \
-  gh release create "$TAG" --title "$TITLE" --notes "Building..." --latest || true
+if ! git push -f origin "refs/tags/$TAG"; then
+  echo "(the tag could not be moved, so the release stays where it is; the files are still replaced)"
+  git tag -d "$TAG" > /dev/null 2>&1 || true
+fi
+if ! gh release view "$TAG" > /dev/null 2>&1; then
+  gh release create "$TAG" --title "$TITLE" --notes "Building..." --latest \
+    || { git fetch -q origin "refs/tags/$TAG:refs/tags/$TAG" 2>/dev/null || true; gh release view "$TAG" > /dev/null 2>&1; } \
+    || { echo "::error::the release '$TAG' could not be made"; exit 1; }
+fi
 echo "### Published to Releases" >> "$GITHUB_STEP_SUMMARY"
 # R74: files this build no longer makes (OBSOLETE, names separated by spaces)
 # are taken off the release, so an old copy is never mistaken for a new one
