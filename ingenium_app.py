@@ -4447,6 +4447,28 @@ def _start_local_server(directory, html_name=None):
         def log_message(self, *a):
             pass
 
+        # R98: the web view must never keep this page. The address is the same for
+        # every build (it has to be: the desk lives with it), and SimpleHTTP sends a
+        # Last-Modified with no cache rule, so WebKit (and WebView2) kept the page and
+        # served an installed 3.9 the 3.6 it had seen before, even after the app was
+        # deleted and installed again: the web view's cache lives outside the app.
+        def send_header(self, keyword, value):
+            if keyword.lower() in ("last-modified", "etag"):
+                return
+            return http.server.SimpleHTTPRequestHandler.send_header(self, keyword, value)
+
+        def send_response(self, *a, **k):
+            self._ing_nocache = False
+            return http.server.SimpleHTTPRequestHandler.send_response(self, *a, **k)
+
+        def end_headers(self):
+            if not getattr(self, "_ing_nocache", False):
+                self._ing_nocache = True
+                http.server.SimpleHTTPRequestHandler.send_header(self, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+                http.server.SimpleHTTPRequestHandler.send_header(self, "Pragma", "no-cache")
+                http.server.SimpleHTTPRequestHandler.send_header(self, "Expires", "0")
+            return http.server.SimpleHTTPRequestHandler.end_headers(self)
+
         def do_POST(self):
             if self.path.split("?", 1)[0] == "/_relay":
                 return _relay_stream(self)
@@ -4557,6 +4579,19 @@ def _start_local_server(directory, html_name=None):
     return httpd.server_address[1]
 
 
+def _page_mark(path):
+    """A short mark that changes with every build of the page: a hash of the whole file
+    (about 14 MB; some tens of milliseconds, once, at start)."""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for piece in iter(lambda: fh.read(1 << 20), b""):
+                h.update(piece)
+        return h.hexdigest()[:12]
+    except Exception:
+        return str(int(time.time()))
+
+
 def _make_window(webview, api, app_url, app_html_path):
     """The main window, in one place so its creation can be guarded.
 
@@ -4587,7 +4622,9 @@ def _make_window(webview, api, app_url, app_html_path):
         directory = os.path.dirname(os.path.abspath(app_html_path))
         name = os.path.basename(app_html_path)
         port = _start_local_server(directory, name)
-        local_url = "http://127.0.0.1:%d/%s" % (port, name)
+        # R98: the address carries this build's mark, so a web view that kept an
+        # earlier page (before the page was sent as never to be kept) cannot use it
+        local_url = "http://127.0.0.1:%d/%s?b=%s" % (port, name, _page_mark(app_html_path))
         log_problem("serving the page at %s (real origin)" % local_url)
         return webview.create_window(WINDOW_TITLE, url=local_url, **common)
     except Exception:
