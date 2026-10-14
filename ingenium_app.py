@@ -3713,6 +3713,7 @@ def _selftest_share(b):
     and stream an answer from the model asked for."""
     out = {"ok": False}
     try:
+        _SHARE["lend"] = True   # R97: the gateway lends only when lending is on; this test lends
         if not _share_start():
             out["error"] = _SHARE["error"] or "the gateway could not start"
             return out
