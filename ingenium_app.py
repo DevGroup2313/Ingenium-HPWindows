@@ -1327,6 +1327,13 @@ class IngeniumApi:
     def installed_models(self):
         return _installed_models()
 
+    # R97: a model's picture reader
+    def install_projector(self, spec):
+        return _install_projector(spec)
+
+    def projector_for(self, model_id):
+        return _mmproj_for(str(model_id))
+
     # R74: lending this computer's models to the person's other devices
     def share_status(self):
         return _share_status()
@@ -1362,6 +1369,19 @@ class IngeniumApi:
 
     def share_find(self):
         return _share_find()
+
+    # R97: when one computer cannot reach the other, the other one calls
+    def share_callins_set(self, on):
+        return _callin_set(bool(on))
+
+    def share_callout_add(self, addr, code):
+        return _callout_add(addr, code)
+
+    def share_callout_remove(self, addr):
+        return _callout_remove(addr)
+
+    def share_firewall_allow(self):
+        return _share_firewall_allow()
 
     # R81: big texts, kept apart from the desk (see _big_put above).
     def big_put(self, bid, text):
@@ -1549,6 +1569,13 @@ class IngeniumApiSingle:
     def installed_models(self):
         return _installed_models()
 
+    # R97: a model's picture reader
+    def install_projector(self, spec):
+        return _install_projector(spec)
+
+    def projector_for(self, model_id):
+        return _mmproj_for(str(model_id))
+
     # R74: lending this computer's models to the person's other devices
     def share_status(self):
         return _share_status()
@@ -1584,6 +1611,19 @@ class IngeniumApiSingle:
 
     def share_find(self):
         return _share_find()
+
+    # R97: when one computer cannot reach the other, the other one calls
+    def share_callins_set(self, on):
+        return _callin_set(bool(on))
+
+    def share_callout_add(self, addr, code):
+        return _callout_add(addr, code)
+
+    def share_callout_remove(self, addr):
+        return _callout_remove(addr)
+
+    def share_firewall_allow(self):
+        return _share_firewall_allow()
 
     # R81: big texts, kept apart from the desk (see _big_put above).
     def big_put(self, bid, text):
@@ -2423,6 +2463,68 @@ def _install_model(spec):
     return {"ok": True}
 
 
+# ---- R97: a model's picture reader (its projector, "mmproj") ----
+# Her report: "All of the local models inside of Ingenium kept on asking for a projector." Models of the lineup
+# that can see (Qwen3.5) now fetch their picture reader with one press. Its maker lists each file's SHA-256 on
+# Hugging Face; the app reads it there over HTTPS, then installs the file the way it installs a model (carried on
+# where it stopped, and kept only when the fingerprint matches).
+def _hf_get_json(url):
+    ctx = ssl.create_default_context(cafile=_CERT_FILE) if _CERT_FILE else ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Ingenium"}), timeout=30, context=ctx) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        if sys.platform == "darwin" and _is_cert_error(e) and os.path.isfile("/usr/bin/curl"):
+            out = subprocess.run(["/usr/bin/curl", "-sSL", "--fail", "-A", "Ingenium", url], capture_output=True, timeout=60)
+            if out.returncode == 0:
+                return json.loads(out.stdout.decode("utf-8"))
+        raise
+
+
+def _projector_resolve(repos, prefer):
+    """The picture reader to fetch: the first repository that lists one, the
+    preferred kind (F16) first. Its size and SHA-256 come from that listing."""
+    order = dict((str(x).lower(), i) for i, x in enumerate(prefer or []))
+    last = ""
+    for repo in repos or []:
+        repo = str(repo)
+        if not re.match(r"^[A-Za-z0-9_.-]{1,96}/[A-Za-z0-9_.-]{1,96}$", repo):
+            continue
+        try:
+            listing = _hf_get_json("https://huggingface.co/api/models/%s/tree/main" % repo)
+        except Exception as e:
+            last = _relay_reason(e)
+            continue
+        files = [f for f in (listing or []) if isinstance(f, dict) and f.get("type") == "file"
+                 and "mmproj" in str(f.get("path") or "").lower() and str(f.get("path")).lower().endswith(".gguf")]
+        if not files:
+            continue
+        files.sort(key=lambda f: (order.get(str(f.get("path")).lower(), 99), int(f.get("size") or 0)))
+        f = files[0]
+        lfs = f.get("lfs") or {}
+        sha = str(lfs.get("oid") or lfs.get("sha256") or "").lower()
+        size = int(lfs.get("size") or f.get("size") or 0)
+        if re.match(r"^[0-9a-f]{64}$", sha) and size > 0:
+            return {"repo": repo, "file": f["path"], "sha256": sha, "size": size}
+    return {"error": last or "its maker lists no picture reader for it"}
+
+
+def _install_projector(spec):
+    spec = spec if isinstance(spec, dict) else {}
+    key = str(spec.get("key") or "")
+    if not re.match(r"^[a-z0-9._-]{2,60}$", key):
+        return {"ok": False, "error": "The request did not name a model of Ingenium's lineup properly."}
+    found = _projector_resolve(spec.get("repos") or [], spec.get("prefer") or [])
+    if found.get("error"):
+        return {"ok": False, "error": "Its picture reader could not be found (%s)." % found["error"]}
+    if "/" in found["file"]:
+        return {"ok": False, "error": "Its picture reader is kept in a folder the app does not read from."}
+    r = _install_model({"key": key + "-mmproj", "url": "https://huggingface.co/%s/resolve/main/%s" % (found["repo"], found["file"]),
+                        "sha256": found["sha256"], "file": found["file"], "size": found["size"],
+                        "name": "%s picture reader" % (spec.get("name") or key), "tiers": []})
+    return dict(r, key=key + "-mmproj", size=found["size"], file=found["file"], repo=found["repo"])
+
+
 def _install_status(key):
     with _INSTALLS_LOCK:
         job = _INSTALLS.get(str(key))
@@ -2447,8 +2549,9 @@ def _installed_models():
         p = _MODEL_PATHS.get(mid)
         if p and os.path.isfile(p):
             lk = meta.get("lineup") or ""
+            role = "drafter" if lk.endswith("-dspark") else ("projector" if lk.endswith("-mmproj") else "model")
             out.append({"id": mid, "name": meta.get("name") or os.path.basename(p), "file": meta.get("file") or os.path.basename(p),
-                        "size": os.path.getsize(p), "lineup": lk, "role": "drafter" if lk.endswith("-dspark") else "model"})
+                        "size": os.path.getsize(p), "lineup": lk, "role": role})
     return out
 
 
@@ -2634,7 +2737,7 @@ def _install_worker(job, sp):
 # * While sharing is on, the computer is kept from going to sleep by itself
 #   (the screen may still turn off), so it stays reachable from another room.
 # ---------------------------------------------------------------------------
-_SHARE = {"server": None, "port": None, "error": "", "fails": {}, "busy": 0, "last": {}, "awake": None, "wanted": False}
+_SHARE = {"server": None, "port": None, "error": "", "fails": {}, "busy": 0, "last": {}, "awake": None, "wanted": False, "lend": False}
 _SHARE_LOCK = threading.Lock()
 _SHARE_PORT = 17860
 _SHARE_CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -2745,14 +2848,16 @@ def _share_models():
     except Exception:
         pass
     for m in _installed_models():
-        if m.get("role") == "drafter" or m["id"] in seen:
+        if m.get("role") in ("drafter", "projector") or m["id"] in seen:
             continue
-        out.append({"id": m["id"], "name": m["name"], "file": m["file"], "size": m["size"], "lineup": m.get("lineup") or ""})
+        out.append({"id": m["id"], "name": m["name"], "file": m["file"], "size": m["size"], "lineup": m.get("lineup") or "",
+                    "vision": bool(_mmproj_for(m["id"]))})
         seen.add(m["id"])
     for mid, p in list(_MODEL_PATHS.items()):
         if mid in seen or mid == "selftest-drafter" or not p or not os.path.isfile(p) or not p.lower().endswith(".gguf"):
             continue
-        if (_MODEL_META.get(mid) or {}).get("lineup", "").endswith("-dspark") or "mmproj" in os.path.basename(p).lower():
+        lk = (_MODEL_META.get(mid) or {}).get("lineup", "")
+        if lk.endswith("-dspark") or lk.endswith("-mmproj") or "mmproj" in os.path.basename(p).lower():
             continue
         out.append({"id": mid, "name": re.sub(r"\.gguf$", "", os.path.basename(p), flags=re.I), "file": os.path.basename(p),
                     "size": os.path.getsize(p), "lineup": (_MODEL_META.get(mid) or {}).get("lineup", "")})
@@ -2863,9 +2968,17 @@ def _share_handler():
         def do_GET(self):
             path = self.path.split("?", 1)[0].rstrip("/")
             if path == "/ingenium/hello":
-                return self._json(200, {"app": "Ingenium", "name": APP_NAME, "computer": _share_computer_name(), "needs_code": True})
+                lend = bool(_SHARE.get("lend"))
+                return self._json(200, {"app": "Ingenium", "name": APP_NAME, "computer": _share_computer_name(), "needs_code": True,
+                                        "lends": lend, "models": len(_share_models()) if lend else 0, "callins": True})
             if not self._allowed():
                 return
+            if path == "/ingenium/callins":
+                return self._json(200, {"callins": _callin_list()})
+            if path.startswith("/ingenium/via/"):
+                return _callin_via_get(self, path)
+            if not _SHARE.get("lend"):
+                return self._err(403, "This computer is not lending its models. Switch sharing on there, in Settings, Your models on every device.")
             if path in ("/v1/models", "/models"):
                 ms = _share_models()
                 return self._json(200, {"object": "list", "data": [dict(m, object="model", owned_by=_share_computer_name() or "ingenium")
@@ -2882,78 +2995,119 @@ def _share_handler():
             path = self.path.split("?", 1)[0].rstrip("/")
             if not self._allowed():
                 return
+            # R97: a computer that this one cannot reach calls in, and carries its models over that call
+            if path == "/ingenium/callin":
+                return _callin_poll(self)
+            if path.startswith("/ingenium/callin/reply/"):
+                return _callin_reply(self, path.rsplit("/", 1)[-1])
+            if path.startswith("/ingenium/via/"):
+                return _callin_via_post(self, path)
             if path not in ("/v1/chat/completions", "/chat/completions"):
                 return self._err(404, "not found")
+            if not _SHARE.get("lend"):
+                return self._err(403, "This computer is not lending its models. Switch sharing on there, in Settings, Your models on every device.")
             try:
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(min(n, 64 << 20)).decode("utf-8") or "{}")
             except Exception:
                 return self._err(400, "the request was not readable")
-            want = str(body.pop("model", "") or "")
-            ctx = body.pop("ingenium_ctx", None)
-            ms = _share_models()
-            pick = None
-            for m in ms:
-                if want and want in (m["id"], m["name"], m["file"], m.get("lineup")):
-                    pick = m
-                    break
-            if pick is None:
-                with _ENGINE_LOCK:
-                    cur = _ENGINE.get("model_id") if _ENGINE.get("state") == "ready" else None
-                pick = next((m for m in ms if m["id"] == cur), None) if not want else None
-            if pick is None:
-                return self._err(404, "This computer has no model called %r. The model list shows the ones it has." % want)
-            with _SHARE_LOCK:
-                _SHARE["busy"] += 1
-            try:
-                with _ENGINE_LOCK:
-                    same = _ENGINE.get("model_id") == pick["id"] and _ENGINE.get("proc") is not None
-                if not same:
-                    r = _engine_start(pick["id"], int(ctx) if ctx else 8192)
-                    if not r.get("ok"):
-                        return self._err(503, r.get("error") or "the engine could not start")
-                try:
-                    st = _share_wait_ready(pick["id"])
-                except Exception as e:
-                    return self._err(503, "The model could not be loaded on the sharing computer: %s" % e)
-                data = json.dumps(body).encode("utf-8")
-                req = urllib.request.Request("http://127.0.0.1:%d/v1/chat/completions" % st["port"], data=data,
-                                             headers={"content-type": "application/json", "authorization": "Bearer " + _ENGINE_SECRET})
-                try:
-                    up = _NO_PROXY.open(req, timeout=1800)
-                except urllib.error.HTTPError as e:
-                    txt = e.read().decode("utf-8", "replace")[:2000]
-                    self.send_response(e.code)
-                    self._cors()
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(txt.encode("utf-8"))
-                    return
-                with up:
-                    self.send_response(200)
-                    self._cors()
-                    self.send_header("Content-Type", up.headers.get("Content-Type") or "application/json")
-                    self.send_header("Cache-Control", "no-cache")
-                    self.send_header("X-Ingenium-Model", pick["id"])
-                    self.end_headers()
-                    while True:
-                        chunk = up.read1(65536) if hasattr(up, "read1") else up.read(4096)
-                        if not chunk:
-                            break
-                        self.wfile.write(chunk)
-                        self.wfile.flush()
-            except (BrokenPipeError, ConnectionResetError):
-                pass   # the other device stopped the reply
-            except Exception as e:
-                log_problem("share: a request failed", sys.exc_info())
-                try:
-                    self._err(500, str(e))
-                except Exception:
-                    pass
-            finally:
-                with _SHARE_LOCK:
-                    _SHARE["busy"] -= 1
+            _share_answer(body, _HandlerSink(self))
     return H
+
+
+class _HandlerSink(object):
+    """Where an answer goes when the device asked this computer directly."""
+
+    def __init__(self, h):
+        self.h = h
+
+    def error(self, code, msg):
+        self.h._err(code, msg)
+
+    def head(self, code, ctype, model_id=None):
+        self.h.send_response(code)
+        self.h._cors()
+        self.h.send_header("Content-Type", ctype or "application/json")
+        self.h.send_header("Cache-Control", "no-cache")
+        if model_id:
+            self.h.send_header("X-Ingenium-Model", model_id)
+        self.h.end_headers()
+
+    def write(self, chunk):
+        self.h.wfile.write(chunk)
+        self.h.wfile.flush()
+
+    def end(self):
+        pass
+
+
+def _share_answer(body, sink):
+    """R97: one request in the common chat format, answered by this computer's
+    own engine and streamed to `sink` (a device that asked directly, or one this
+    computer calls). It loads the model asked for when another one is running."""
+    want = str(body.pop("model", "") or "")
+    ctx = body.pop("ingenium_ctx", None)
+    ms = _share_models()
+    pick = None
+    for m in ms:
+        if want and want in (m["id"], m["name"], m["file"], m.get("lineup")):
+            pick = m
+            break
+    if pick is None:
+        with _ENGINE_LOCK:
+            cur = _ENGINE.get("model_id") if _ENGINE.get("state") == "ready" else None
+        pick = next((m for m in ms if m["id"] == cur), None) if not want else None
+    if pick is None:
+        return sink.error(404, "This computer has no model called %r. The model list shows the ones it has." % want)
+    with _SHARE_LOCK:
+        _SHARE["busy"] += 1
+    try:
+        has_pic = any(isinstance(m, dict) and isinstance(m.get("content"), list) and
+                      any(isinstance(c, dict) and c.get("type") in ("image_url", "input_image") for c in m["content"])
+                      for m in (body.get("messages") or []))
+        proj = _mmproj_for(pick["id"]) if has_pic else None
+        with _ENGINE_LOCK:
+            same = _ENGINE.get("model_id") == pick["id"] and _ENGINE.get("proc") is not None
+            args = _ENGINE.get("args")
+            if same and proj and not (args and len(args) > 2 and args[2]):
+                same = False   # running without its picture reader
+        if not same:
+            r = _engine_start(pick["id"], int(ctx) if ctx else 8192, proj)
+            if not r.get("ok"):
+                return sink.error(503, r.get("error") or "the engine could not start")
+        try:
+            st = _share_wait_ready(pick["id"])
+        except Exception as e:
+            return sink.error(503, "The model could not be loaded on the sharing computer: %s" % e)
+        data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request("http://127.0.0.1:%d/v1/chat/completions" % st["port"], data=data,
+                                     headers={"content-type": "application/json", "authorization": "Bearer " + _ENGINE_SECRET})
+        try:
+            up = _NO_PROXY.open(req, timeout=1800)
+        except urllib.error.HTTPError as e:
+            txt = e.read().decode("utf-8", "replace")[:2000]
+            sink.head(e.code, "application/json")
+            sink.write(txt.encode("utf-8"))
+            return sink.end()
+        with up:
+            sink.head(200, up.headers.get("Content-Type") or "application/json", pick["id"])
+            while True:
+                chunk = up.read1(65536) if hasattr(up, "read1") else up.read(4096)
+                if not chunk:
+                    break
+                sink.write(chunk)
+        sink.end()
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        pass   # the other device stopped the reply
+    except Exception as e:
+        log_problem("share: a request failed", sys.exc_info())
+        try:
+            sink.error(500, str(e))
+        except Exception:
+            pass
+    finally:
+        with _SHARE_LOCK:
+            _SHARE["busy"] -= 1
 
 
 def _share_start():
@@ -2979,7 +3133,6 @@ def _share_start():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     with _SHARE_LOCK:
         _SHARE.update(server=srv, port=srv.server_address[1], error="")
-    _share_keep_awake(True)
     return True
 
 
@@ -2992,7 +3145,6 @@ def _share_stop():
             srv.server_close()
         except Exception:
             pass
-    _share_keep_awake(False)
 
 
 def _share_status():
@@ -3000,22 +3152,37 @@ def _share_status():
         port, busy, err = _SHARE["port"], _SHARE["busy"], _SHARE["error"]
         now = time.time()
         recent = sorted([(t, ip) for ip, t in _SHARE["last"].items() if now - t < 3600], reverse=True)
-    on = port is not None
-    return {"ok": True, "on": on, "port": port, "code": _share_code(), "addresses": _share_addresses(port) if on else [],
+    running = port is not None
+    cfg = _share_cfg()
+    lend = running and bool(cfg.get("on"))
+    return {"ok": True, "on": lend, "running": running, "callins_on": bool(cfg.get("callins")), "port": port,
+            "code": _share_code(), "addresses": _share_addresses(port) if running else [],
             "computer": _share_computer_name(), "busy": busy, "error": err,
             "recent": [{"address": ip, "minutes_ago": int((now - t) // 60)} for t, ip in recent[:6]],
-            "models": len(_share_models()) if on else 0, "awake": _SHARE.get("awake") is not None}
+            "models": len(_share_models()) if lend else 0, "awake": _SHARE.get("awake") is not None,
+            "callins": _callin_list(), "callouts": _callout_list(), "firewall": _share_firewall()}
 
 
 def _share_set(on):
     c = _share_cfg()
     c["on"] = bool(on)
     _share_cfg_save(c)
-    if on:
+    _share_apply()
+    return _share_status()
+
+
+def _share_apply():
+    """R97: the gateway runs while this computer lends its models, or while it
+    lets the person's other computers call it (to lend it theirs)."""
+    c = _share_cfg()
+    _SHARE["lend"] = bool(c.get("on"))
+    if c.get("on") or c.get("callins"):
         _share_start()
     else:
         _share_stop()
-    return _share_status()
+    # only lending keeps the computer awake; a laptop that borrows sleeps as it likes
+    _share_keep_awake(bool(c.get("on")) and _SHARE["server"] is not None)
+    _callout_apply()
 
 
 def _share_renew_code():
@@ -3028,12 +3195,453 @@ def _share_renew_code():
 
 
 def _share_autostart():
-    """Sharing that was on when the app closed is on again when it opens."""
+    """Sharing that was on when the app closed is on again when it opens, and so
+    are the calls this computer makes to lend its models to another."""
     try:
-        if _share_cfg().get("on"):
-            _share_start()
+        _share_apply()
     except Exception:
         log_problem("share: could not start at launch", sys.exc_info())
+
+
+# ---------------------------------------------------------------------------
+# R97: when one computer cannot reach the other, the other one calls.
+#
+# On the owner's network the Mac mini could use the MacBook's models but the
+# MacBook could never reach the Mac mini. Either side of that is a gate macOS
+# keeps: the lending Mac's firewall refuses calls that come in, or the asking
+# Mac is not allowed to start calls to the home network (Local Network, in
+# Privacy & Security). Both leave the other direction open, so the lending
+# computer now calls the asking one and keeps that call open:
+#
+# * The asking computer lets its other computers call it (Settings, Your models
+#   on every device). Its gateway then runs without lending anything itself.
+# * The lending computer is told the asking one's address and pairing code. It
+#   calls in, says which models it has, and waits; when the asking computer's
+#   chat sends a request, it travels back down that call, is answered by the
+#   lending computer's own engine, and the reply streams back word by word.
+# * The asking computer's page talks only to its own gateway on this computer
+#   (127.0.0.1), which needs no permission at all.
+# ---------------------------------------------------------------------------
+import queue as _queue
+
+_CALLIN = {}        # lender id -> {"computer", "models", "last", "jobs": Queue, "addr"}
+_CALLIN_JOBS = {}   # job id -> {"out": Queue, "lid", "made"}
+_CALLIN_LOCK = threading.Lock()
+_CALLOUT = {}       # address -> {"addr", "code", "computer", "state", "error", "last", "stop": Event}
+_CALLOUT_LOCK = threading.Lock()
+
+
+def _share_lender_id():
+    c = _share_cfg()
+    lid = str(c.get("id") or "")
+    if not re.fullmatch(r"[a-z0-9]{12}", lid):
+        import secrets
+        lid = "".join(secrets.choice("abcdefghijkmnpqrstuvwxyz23456789") for _ in range(12))
+        c["id"] = lid
+        _share_cfg_save(c)
+    return lid
+
+
+def _callin_list():
+    now = time.time()
+    with _CALLIN_LOCK:
+        return [{"id": lid, "computer": c.get("computer") or "", "models": c.get("models") or [],
+                 "address": c.get("addr") or "", "seconds_ago": int(now - c.get("last", 0))}
+                for lid, c in _CALLIN.items() if now - c.get("last", 0) < 120]
+
+
+def _callin_set(on):
+    c = _share_cfg()
+    c["callins"] = bool(on)
+    _share_cfg_save(c)
+    _share_apply()
+    return _share_status()
+
+
+def _callin_poll(h):
+    """A lending computer calls in: it says what it has, then waits (up to 25
+    seconds) for a request from this computer's chat."""
+    try:
+        n = int(h.headers.get("Content-Length") or 0)
+        info = json.loads(h.rfile.read(min(n, 4 << 20)).decode("utf-8") or "{}")
+    except Exception:
+        return h._err(400, "the call was not readable")
+    lid = str(info.get("id") or "")
+    if not re.fullmatch(r"[a-z0-9]{12}", lid):
+        return h._err(400, "the call carried no name")
+    models = [m for m in (info.get("models") or []) if isinstance(m, dict) and m.get("name")][:200]
+    with _CALLIN_LOCK:
+        c = _CALLIN.get(lid)
+        if c is None:
+            c = _CALLIN[lid] = {"jobs": _queue.Queue()}
+        c.update(computer=str(info.get("computer") or "")[:80], models=models, last=time.time(), addr=h.client_address[0])
+        jobs = c["jobs"]
+    try:
+        job = jobs.get(timeout=25)
+    except _queue.Empty:
+        job = None
+    with _CALLIN_LOCK:
+        if lid in _CALLIN:
+            _CALLIN[lid]["last"] = time.time()
+    return h._json(200, {"job": job})
+
+
+def _callin_read_chunked(rfile):
+    """The body of a reply sent in chunks, piece by piece, as it arrives."""
+    while True:
+        line = rfile.readline(1024)
+        if not line:
+            return
+        size = int(line.split(b";", 1)[0].strip() or b"0", 16)
+        if size == 0:
+            rfile.readline(1024)
+            return
+        data = rfile.read(size)
+        rfile.readline(8)
+        yield data
+
+
+def _callin_reply(h, jid):
+    with _CALLIN_LOCK:
+        job = _CALLIN_JOBS.get(jid)
+    if job is None:
+        return h._err(404, "that request is no longer waiting")
+    out = job["out"]
+    try:
+        code = int(h.headers.get("X-Ingenium-Status") or 200)
+    except Exception:
+        code = 200
+    out.put(("head", code, h.headers.get("Content-Type") or "application/json", h.headers.get("X-Ingenium-Model") or ""))
+    try:
+        if (h.headers.get("Transfer-Encoding") or "").lower() == "chunked":
+            for piece in _callin_read_chunked(h.rfile):
+                out.put(("data", piece))
+        else:
+            n = int(h.headers.get("Content-Length") or 0)
+            if n:
+                out.put(("data", h.rfile.read(n)))
+    except Exception:
+        log_problem("call-in: a reply broke off", sys.exc_info())
+    finally:
+        out.put(("end",))
+    return h._json(200, {"ok": True})
+
+
+def _callin_via_parse(path):
+    m = re.match(r"^/ingenium/via/([a-z0-9]{12})(/.*)?$", path)
+    return (m.group(1), m.group(2) or "") if m else (None, None)
+
+
+def _callin_via_get(h, path):
+    lid, rest = _callin_via_parse(path)
+    with _CALLIN_LOCK:
+        c = _CALLIN.get(lid) if lid else None
+        fresh = c is not None and time.time() - c.get("last", 0) < 120
+        models = list(c.get("models") or []) if c else []
+        who = (c or {}).get("computer") or "the other computer"
+    if not fresh:
+        return h._err(503, "%s has not called in for a while. Check that Ingenium is open there." % who)
+    if rest.rstrip("/") in ("/v1/models", "/models"):
+        return h._json(200, {"object": "list", "data": [dict(m, object="model", owned_by=who) for m in models]})
+    return h._err(404, "not found")
+
+
+def _callin_via_post(h, path):
+    """This computer's chat asks a computer that called in: the request goes
+    down that call and the answer streams back."""
+    lid, rest = _callin_via_parse(path)
+    if rest.rstrip("/") not in ("/v1/chat/completions", "/chat/completions"):
+        return h._err(404, "not found")
+    with _CALLIN_LOCK:
+        c = _CALLIN.get(lid) if lid else None
+        fresh = c is not None and time.time() - c.get("last", 0) < 120
+        who = (c or {}).get("computer") or "the other computer"
+    if not fresh:
+        return h._err(503, "%s has not called in for a while. Check that Ingenium is open there and still lends to this computer." % who)
+    try:
+        n = int(h.headers.get("Content-Length") or 0)
+        body = json.loads(h.rfile.read(min(n, 64 << 20)).decode("utf-8") or "{}")
+    except Exception:
+        return h._err(400, "the request was not readable")
+    import secrets
+    jid = secrets.token_hex(8)
+    out = _queue.Queue()
+    with _CALLIN_LOCK:
+        _CALLIN_JOBS[jid] = {"out": out, "lid": lid, "made": time.time()}
+    c["jobs"].put({"id": jid, "body": body})
+    try:
+        try:
+            first = out.get(timeout=45)
+        except _queue.Empty:
+            return h._err(504, "%s did not pick the request up. Check that Ingenium is open there." % who)
+        if first[0] != "head":
+            return h._err(502, "%s sent no answer." % who)
+        h.send_response(first[1])
+        h._cors()
+        h.send_header("Content-Type", first[2])
+        h.send_header("Cache-Control", "no-cache")
+        if first[3]:
+            h.send_header("X-Ingenium-Model", first[3])
+        h.end_headers()
+        while True:
+            try:
+                item = out.get(timeout=1800)
+            except _queue.Empty:
+                break
+            if item[0] == "end":
+                break
+            h.wfile.write(item[1])
+            h.wfile.flush()
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        pass
+    finally:
+        with _CALLIN_LOCK:
+            _CALLIN_JOBS.pop(jid, None)
+
+
+class _CallSink(object):
+    """Where an answer goes when this computer lends by calling: back up the
+    call, in chunks, to the computer that asked."""
+
+    def __init__(self, addr, code, jid):
+        self.addr, self.code, self.jid = addr, code, jid
+        self.conn = None
+
+    def _open(self, code, ctype, model_id=None):
+        import http.client
+        host, _, port = self.addr.rpartition(":")
+        self.conn = http.client.HTTPConnection(host, int(port), timeout=1800)
+        self.conn.putrequest("POST", "/ingenium/callin/reply/" + self.jid)
+        self.conn.putheader("Authorization", "Bearer " + self.code)
+        self.conn.putheader("Transfer-Encoding", "chunked")
+        self.conn.putheader("X-Ingenium-Status", str(code))
+        self.conn.putheader("Content-Type", ctype or "application/json")
+        if model_id:
+            self.conn.putheader("X-Ingenium-Model", model_id)
+        self.conn.endheaders()
+
+    def head(self, code, ctype, model_id=None):
+        self._open(code, ctype, model_id)
+
+    def write(self, chunk):
+        if chunk:
+            self.conn.send(("%x\r\n" % len(chunk)).encode("ascii") + chunk + b"\r\n")
+
+    def end(self):
+        if self.conn is not None:
+            try:
+                self.conn.send(b"0\r\n\r\n")
+                self.conn.getresponse().read()
+            finally:
+                self.conn.close()
+                self.conn = None
+
+    def error(self, code, msg):
+        self.head(code, "application/json")
+        self.write(json.dumps({"error": {"message": msg, "code": code}}).encode("utf-8"))
+        self.end()
+
+
+def _callout_job(entry, job):
+    try:
+        _share_answer(dict(job.get("body") or {}), _CallSink(entry["addr"], entry["code"], str(job.get("id") or "")))
+    except Exception:
+        log_problem("call-out: a request could not be answered", sys.exc_info())
+
+
+def _callout_loop(entry):
+    """Calls the asking computer, again and again, for as long as this computer
+    lends to it. A missed call is tried again after a short wait."""
+    wait = 3
+    while not entry["stop"].is_set():
+        try:
+            if not _SHARE.get("lend"):
+                entry.update(state="paused", error="Sharing is off on this computer.")
+                entry["stop"].wait(5)
+                continue
+            body = json.dumps({"id": _share_lender_id(), "computer": _share_computer_name(),
+                               "models": _share_models()}).encode("utf-8")
+            req = urllib.request.Request("http://%s/ingenium/callin" % entry["addr"], data=body, method="POST",
+                                         headers={"Content-Type": "application/json", "Authorization": "Bearer " + entry["code"]})
+            with _NO_PROXY.open(req, timeout=40) as r:
+                got = json.loads(r.read().decode("utf-8") or "{}")
+            entry.update(state="linked", error="", last=time.time())
+            wait = 3
+            job = got.get("job")
+            if job:
+                threading.Thread(target=_callout_job, args=(entry, job), daemon=True).start()
+        except urllib.error.HTTPError as e:
+            msg = ""
+            try:
+                msg = (json.loads(e.read().decode("utf-8", "replace")).get("error") or {}).get("message") or ""
+            except Exception:
+                pass
+            entry.update(state="refused", error=msg or ("It answered %d." % e.code))
+            entry["stop"].wait(60 if e.code in (401, 429) else 15)
+        except Exception as e:
+            entry.update(state="waiting", error=_relay_reason(e))
+            entry["stop"].wait(wait)
+            wait = min(wait * 2, 30)
+
+
+def _callout_apply():
+    """Starts the calls kept in the settings, and stops those no longer kept."""
+    want = {}
+    for x in _share_cfg().get("callouts") or []:
+        if isinstance(x, dict) and x.get("addr") and x.get("code"):
+            want[str(x["addr"])] = x
+    with _CALLOUT_LOCK:
+        for addr in list(_CALLOUT):
+            if addr not in want or _CALLOUT[addr]["code"] != want[addr]["code"]:
+                _CALLOUT.pop(addr)["stop"].set()
+        for addr, x in want.items():
+            if addr in _CALLOUT:
+                continue
+            e = {"addr": addr, "code": str(x["code"]), "computer": str(x.get("computer") or ""), "state": "starting",
+                 "error": "", "last": 0.0, "stop": threading.Event()}
+            _CALLOUT[addr] = e
+            threading.Thread(target=_callout_loop, args=(e,), daemon=True).start()
+
+
+def _callout_list():
+    now = time.time()
+    with _CALLOUT_LOCK:
+        return [{"address": e["addr"], "computer": e["computer"], "state": e["state"], "error": e["error"],
+                 "seconds_ago": int(now - e["last"]) if e["last"] else None} for e in _CALLOUT.values()]
+
+
+def _callout_add(addr, code):
+    """Lend to a computer that cannot reach this one: check it answers, then keep calling it."""
+    a = re.sub(r"^https?://", "", str(addr or "").strip()).split("/", 1)[0]
+    if not a:
+        return {"ok": False, "error": "Type the address that the other computer shows."}
+    if not re.search(r":\d+$", a):
+        a += ":%d" % _SHARE_PORT
+    code = str(code or "").upper().strip()
+    if len(_share_norm(code)) != 8:
+        return {"ok": False, "error": "Type the eight-letter pairing code that the other computer shows."}
+    try:
+        with _NO_PROXY.open("http://%s/ingenium/hello" % a, timeout=8) as r:
+            hello = json.loads(r.read().decode("utf-8") or "{}")
+    except Exception as e:
+        return {"ok": False, "error": _relay_reason(e)}
+    if hello.get("app") != "Ingenium":
+        return {"ok": False, "error": "Something answered at that address, but it is not Ingenium."}
+    if not hello.get("callins"):
+        return {"ok": False, "error": "That copy of Ingenium is older and cannot be called. Update it first."}
+    try:
+        req = urllib.request.Request("http://%s/ingenium/callins" % a, headers={"Authorization": "Bearer " + code})
+        with _NO_PROXY.open(req, timeout=8) as r:
+            r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return {"ok": False, "error": "The pairing code is not right. It is the code the other computer shows."}
+        return {"ok": False, "error": "The other computer answered %d." % e.code}
+    except Exception as e:
+        return {"ok": False, "error": _relay_reason(e)}
+    c = _share_cfg()
+    keep = [x for x in (c.get("callouts") or []) if isinstance(x, dict) and x.get("addr") != a]
+    keep.append({"addr": a, "code": code, "computer": str(hello.get("computer") or "")})
+    c["callouts"] = keep
+    if not c.get("on"):
+        c["on"] = True   # lending to it is sharing
+    _share_cfg_save(c)
+    _share_apply()
+    return dict(_share_status(), ok=True)
+
+
+def _callout_remove(addr):
+    c = _share_cfg()
+    c["callouts"] = [x for x in (c.get("callouts") or []) if isinstance(x, dict) and x.get("addr") != addr]
+    _share_cfg_save(c)
+    _callout_apply()
+    return _share_status()
+
+
+# ---- R97: the Mac's own firewall, which can refuse calls that come in ----
+_FW = "/usr/libexec/ApplicationFirewall/socketfilterfw"
+
+
+def _app_exe_for_firewall():
+    exe = os.path.realpath(sys.executable or "")
+    return exe if os.path.isfile(exe) else ""
+
+
+_FW_SEEN = {"at": 0.0, "v": None}
+
+
+def _share_firewall(fresh=False):
+    """Whether macOS's firewall lets other devices reach this app. None
+    elsewhere, or when it cannot be read. Read at most every half minute."""
+    if sys.platform != "darwin" or not os.path.exists(_FW):
+        return None
+    if not fresh and time.time() - _FW_SEEN["at"] < 30:
+        return _FW_SEEN["v"]
+    _FW_SEEN.update(at=time.time(), v=_share_firewall_read())
+    return _FW_SEEN["v"]
+
+
+def _share_firewall_read():
+    try:
+        def ask(*a):
+            r = subprocess.run([_FW] + list(a), capture_output=True, text=True, timeout=6)
+            return ((r.stdout or "") + (r.stderr or "")).strip()
+        g = ask("--getglobalstate").lower()
+        on = ("enabled" in g) or ("state = 1" in g) or ("state = 2" in g)
+        if not on:
+            return {"on": False, "blocked": False, "block_all": False}
+        block_all = "enabled" in ask("--getblockall").lower()
+        exe = _app_exe_for_firewall()
+        app = ask("--getappblocked", exe).lower() if exe else ""
+        # "... is permitted", "... is blocked", or "... is not part of the firewall" (then macOS asks once, and a
+        # missed or refused question leaves calls from outside refused)
+        blocked = block_all or ("is blocked" in app) or ("not part of the firewall" in app)
+        return {"on": True, "blocked": bool(blocked), "block_all": block_all, "app": app[:200]}
+    except Exception:
+        return None
+
+
+def _share_firewall_allow():
+    """Asks for the Mac's administrator password once, then lets Ingenium
+    accept calls from the person's other devices."""
+    if sys.platform != "darwin" or not os.path.exists(_FW):
+        return {"ok": False, "error": "There is no Mac firewall to change here."}
+    exe = _app_exe_for_firewall()
+    if not exe:
+        return {"ok": False, "error": "The app's own program could not be found."}
+    q = exe.replace("\\", "\\\\").replace('"', '\\"').replace("'", "'\\''")
+    cmd = "%s --add '%s' ; %s --unblockapp '%s'" % (_FW, q, _FW, q)
+    try:
+        r = subprocess.run(["osascript", "-e", 'do shell script "%s" with administrator privileges' % cmd.replace('"', '\\"')],
+                           capture_output=True, text=True, timeout=180)
+        if r.returncode != 0:
+            return {"ok": False, "error": (r.stderr or "").strip() or "The firewall was not changed."}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    _share_firewall(fresh=True)
+    return dict(_share_status(), ok=True)
+
+
+def _mmproj_for(mid):
+    """The vision projector kept for a model (its lineup entry with -mmproj), when it is on disk."""
+    try:
+        own = _model_path_for(str(mid) + "-mmproj")
+        if own and os.path.isfile(own):
+            return str(mid) + "-mmproj"
+        _load_models_index()
+        if mid.startswith("builtin-") and mid not in _BUILTIN_LINEUP:
+            _builtin_models()
+        key = _BUILTIN_LINEUP.get(mid) or (_MODEL_META.get(mid) or {}).get("lineup") or ""
+        if not key or key.endswith("-mmproj") or key.endswith("-dspark"):
+            return None
+        for pmid, meta in list(_MODEL_META.items()):
+            if meta.get("lineup") == key + "-mmproj":
+                p = _MODEL_PATHS.get(pmid)
+                if p and os.path.isfile(p):
+                    return pmid
+    except Exception:
+        log_problem("engine: looking for a projector failed", sys.exc_info())
+    return None
 
 
 def _selftest_speedup(b, dpath):
@@ -3709,7 +4317,8 @@ def _share_find():
                         h = json.loads(resp.read().decode("utf-8", "replace") or "{}")
                     if h.get("app") == "Ingenium":
                         hits.append({"address": "%s:%d" % (ip, port), "computer": h.get("computer") or "",
-                                     "models": h.get("models") or 0})
+                                     "models": h.get("models") or 0, "lends": bool(h.get("lends", True)),
+                                     "callins": bool(h.get("callins"))})
                 except Exception:
                     pass
         return hits
