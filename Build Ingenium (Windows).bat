@@ -184,7 +184,7 @@ if exist dist rmdir /s /q dist
 rem R77: this build's own number (the version, the day and the time it was
 rem built), shown in About, as the cloud builds show theirs
 set "BUILD_NO="
-for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=3.5.%%B"
+for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=3.6.%%B"
 if defined BUILD_NO (
   call :runlive "'%VPY%' tools\stamp_build.py ingenium.html !BUILD_NO!"
   call :say "Build number: !BUILD_NO!"

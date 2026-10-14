@@ -508,6 +508,8 @@ def _relay_reason(e):
         return "That site's security certificate could not be checked (%s)." % text
     if "getaddrinfo" in low or "name or service" in low or "nodename" in low or "11001" in low:
         return "That name could not be found. Is this computer online?"
+    if "no route to host" in low or "host is down" in low or "network is unreachable" in low or "errno 65" in low or "errno 51" in low:
+        return "LOCALNET: this computer was not allowed to reach that address on the home network (%s)." % text
     return text
 
 
@@ -1345,6 +1347,22 @@ class IngeniumApi:
     def save_state(self, raw):
         return _save_state(raw)
 
+    # R96: earlier desks, and finding the other computer
+    def desk_list(self):
+        return _desk_list()
+
+    def desk_read(self, did):
+        return _desk_read(did)
+
+    def desk_keep_now(self, reason="before-restore"):
+        return _desk_keep(reason or "kept")
+
+    def desk_keep_text(self, raw, reason="before-adopt"):
+        return _desk_keep(reason or "kept", raw if isinstance(raw, str) else str(raw or ""))
+
+    def share_find(self):
+        return _share_find()
+
     # R81: big texts, kept apart from the desk (see _big_put above).
     def big_put(self, bid, text):
         return _big_put(bid, text)
@@ -1550,6 +1568,22 @@ class IngeniumApiSingle:
 
     def save_state(self, raw):
         return _save_state(raw)
+
+    # R96: earlier desks, and finding the other computer
+    def desk_list(self):
+        return _desk_list()
+
+    def desk_read(self, did):
+        return _desk_read(did)
+
+    def desk_keep_now(self, reason="before-restore"):
+        return _desk_keep(reason or "kept")
+
+    def desk_keep_text(self, raw, reason="before-adopt"):
+        return _desk_keep(reason or "kept", raw if isinstance(raw, str) else str(raw or ""))
+
+    def share_find(self):
+        return _share_find()
 
     # R81: big texts, kept apart from the desk (see _big_put above).
     def big_put(self, bid, text):
@@ -3401,6 +3435,7 @@ def _save_state(raw):
     if len(txt) > 64 * 1024 * 1024:
         return False
     try:
+        _desk_before_save(txt)
         tmp = str(p) + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             fh.write(txt)
@@ -3409,6 +3444,285 @@ def _save_state(raw):
     except Exception:
         log_problem("save_state failed", sys.exc_info())
         return False
+
+
+# ---------------------------------------------------------------------------
+# R96: the desk keeps its history (see stage 8 of the shell patches).
+# ---------------------------------------------------------------------------
+def _desk_backup_dir():
+    p = _desk_path()
+    if p is None:
+        return None
+    d = p.parent / "desk-backups"
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return None
+    return d
+
+
+def _desk_counts(txt):
+    """Conversations and messages in a desk, counted without parsing a large file."""
+    return len(re.findall(r'"messages"\s*:', txt)), len(re.findall(r'"role"\s*:\s*"(?:me|bot)"', txt))
+
+
+def _desk_prune(d, keep=40):
+    try:
+        files = sorted(d.glob("desk-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in files[keep:]:
+            try:
+                f.unlink()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _desk_keep(reason, txt=None):
+    d = _desk_backup_dir()
+    p = _desk_path()
+    if d is None or p is None:
+        return ""
+    try:
+        if txt is None:
+            if not p.is_file():
+                return ""
+            txt = p.read_text(encoding="utf-8")
+        if len(txt) < 60:
+            return ""
+        now = time.time()
+        name = "desk-%s%03d-%s.json" % (time.strftime("%Y%m%d-%H%M%S", time.localtime(now)), int(now * 1000) % 1000,
+                                       re.sub(r"[^a-z-]", "", reason)[:24] or "kept")
+        while (d / name).exists():
+            name = name[:-5] + "x.json"
+        tmp = d / (name + ".part")
+        tmp.write_text(txt, encoding="utf-8")
+        os.replace(str(tmp), str(d / name))
+        _desk_prune(d)
+        return name
+    except Exception:
+        log_problem("desk: a copy could not be kept", sys.exc_info())
+        return ""
+
+
+def _desk_before_save(new_txt):
+    """Called just before desk.json is replaced: keep the day's first desk, and a desk about to shrink sharply."""
+    p = _desk_path()
+    if p is None or not p.is_file():
+        return
+    try:
+        old = p.read_text(encoding="utf-8")
+    except Exception:
+        return
+    if len(old) < 60:
+        return
+    d = _desk_backup_dir()
+    if d is None:
+        return
+    try:
+        today = time.strftime("%Y%m%d")
+        if not list(d.glob("desk-%s-*-daily.json" % today)):
+            _desk_keep("daily", old)
+        oc, om = _desk_counts(old)
+        nc, nm = _desk_counts(new_txt)
+        if om > 0 and (nm * 2 < om or len(new_txt) * 5 < len(old) * 2):
+            _desk_keep("before-shrink", old)
+    except Exception:
+        log_problem("desk: the history check failed", sys.exc_info())
+
+
+def _desk_titles(txt):
+    try:
+        if len(txt) > 40 * 1024 * 1024:
+            return []
+        st = json.loads(txt)
+        chats = st.get("chats") or []
+        out = []
+        for c in chats[-8:][::-1]:
+            t = str((c or {}).get("title") or "").strip()
+            if t:
+                out.append(t[:80])
+        return out[:6]
+    except Exception:
+        return []
+
+
+_DESK_KEYS = ("ingenium_v4", "the_foundry_v4", "the_foundry_v3", "the_foundry_v2")
+
+
+def _desk_webkit_files():
+    """On a Mac, the web view's own stores that may still hold an earlier desk."""
+    out = []
+    if sys.platform != "darwin":
+        return out
+    roots = [pathlib.Path.home() / "Library" / "WebKit"]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for dirpath, dirnames, filenames in os.walk(str(root)):
+            if dirpath.count(os.sep) - str(root).count(os.sep) > 9:
+                dirnames[:] = []
+                continue
+            for f in filenames:
+                if f == "localstorage.sqlite3" or f.endswith(".localstorage"):
+                    out.append(os.path.join(dirpath, f))
+            if len(out) > 400:
+                return out
+    return out
+
+
+def _desk_webkit_read(path):
+    import sqlite3
+    try:
+        con = sqlite3.connect("file:%s?mode=ro&immutable=1" % path, uri=True, timeout=2)
+    except Exception:
+        return None
+    try:
+        for k in _DESK_KEYS:
+            try:
+                row = con.execute("SELECT value FROM ItemTable WHERE key=?", (k,)).fetchone()
+            except Exception:
+                return None
+            if not row:
+                continue
+            v = row[0]
+            if isinstance(v, (bytes, bytearray)):
+                txt = None
+                for enc in ("utf-16-le", "utf-8"):
+                    try:
+                        t = bytes(v).decode(enc)
+                        if t.lstrip().startswith("{"):
+                            txt = t
+                            break
+                    except Exception:
+                        continue
+                if txt:
+                    return txt
+            elif isinstance(v, str) and v.lstrip().startswith("{"):
+                return v
+        return None
+    finally:
+        try:
+            con.close()
+        except Exception:
+            pass
+
+
+def _desk_when(txt, fallback):
+    m = re.search(r'"__deskAt"\s*:\s*(\d{3,14})', txt)
+    return int(m.group(1)) if m else fallback
+
+
+def _desk_list():
+    """Earlier desks on this computer: the kept copies and the web view's earlier stores, newest first."""
+    out = []
+    d = _desk_backup_dir()
+    if d is not None:
+        for f in d.glob("desk-*.json"):
+            try:
+                txt = f.read_text(encoding="utf-8")
+                c, m = _desk_counts(txt)
+                out.append({"id": "b:" + f.name, "kind": "kept", "reason": f.name.split("-", 3)[-1][:-5],
+                            "when": _desk_when(txt, int(f.stat().st_mtime * 1000)), "size": len(txt),
+                            "chats": c, "messages": m, "titles": _desk_titles(txt)})
+            except Exception:
+                pass
+    for path in _desk_webkit_files():
+        txt = _desk_webkit_read(path)
+        if not txt or len(txt) < 60:
+            continue
+        c, m = _desk_counts(txt)
+        try:
+            mt = int(os.stat(path).st_mtime * 1000)
+        except Exception:
+            mt = 0
+        out.append({"id": "w:" + path, "kind": "web view", "reason": "an earlier address", "when": _desk_when(txt, mt),
+                    "size": len(txt), "chats": c, "messages": m, "titles": _desk_titles(txt)})
+    out.sort(key=lambda x: x.get("when", 0), reverse=True)
+    return out[:60]
+
+
+def _desk_read(did):
+    did = str(did or "")
+    try:
+        if did.startswith("b:"):
+            d = _desk_backup_dir()
+            name = os.path.basename(did[2:])
+            if d is None or not re.fullmatch(r"desk-[0-9A-Za-z_.-]+\.json", name):
+                return ""
+            return (d / name).read_text(encoding="utf-8")
+        if did.startswith("w:"):
+            path = did[2:]
+            if path not in _desk_webkit_files():
+                return ""
+            return _desk_webkit_read(path) or ""
+    except Exception:
+        log_problem("desk: an earlier desk could not be read", sys.exc_info())
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# R96: finding the other computer on the home network.
+# ---------------------------------------------------------------------------
+def _share_find():
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+    me = ""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("192.168.255.255", 1))
+            me = s.getsockname()[0]
+        finally:
+            s.close()
+    except Exception:
+        me = ""
+    if not re.match(r"^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)", me or ""):
+        return {"found": [], "me": me, "error": "NONET"}
+    base = me.rsplit(".", 1)[0] + "."
+    blocked = [0]
+    reached = [0]
+
+    def probe(ip):
+        hits = []
+        for port in (17860, 17861, 17862):
+            k = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            k.settimeout(0.45)
+            try:
+                r = k.connect_ex((ip, port))
+            except Exception:
+                r = -1
+            finally:
+                try:
+                    k.close()
+                except Exception:
+                    pass
+            if r in (65, 51, 64):
+                blocked[0] += 1
+                return hits
+            if r == 61 or r == 111 or r == 10061:
+                reached[0] += 1
+            if r == 0:
+                reached[0] += 1
+                try:
+                    with urllib.request.urlopen("http://%s:%d/ingenium/hello" % (ip, port), timeout=2.5) as resp:
+                        h = json.loads(resp.read().decode("utf-8", "replace") or "{}")
+                    if h.get("app") == "Ingenium":
+                        hits.append({"address": "%s:%d" % (ip, port), "computer": h.get("computer") or "",
+                                     "models": h.get("models") or 0})
+                except Exception:
+                    pass
+        return hits
+
+    ips = [base + str(i) for i in range(1, 255) if base + str(i) != me]
+    found = []
+    with ThreadPoolExecutor(max_workers=64) as ex:
+        for hits in ex.map(probe, ips):
+            found.extend(hits)
+    err = ""
+    if not found and blocked[0] > 50 and reached[0] == 0:
+        err = "LOCALNET"
+    return {"found": found, "me": me, "error": err}
 
 
 # R81: big texts (a whole app pasted or attached, a page kept for the
