@@ -46,9 +46,9 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -58,9 +58,9 @@ jobs:
           echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
           echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
           # the build number: the version, the day and this repository's run number
-          echo "INGENIUM_VERSION=3.4.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERSION=3.5.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
           # Windows' own file version allows no part above 65535
-          echo "INGENIUM_VERNUM=3.4.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERNUM=3.5.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
       - name: Get the engine (llama.cpp's Windows build, checked)
         run: python tools/get_engine_windows.py engine/windows-x64.zip
@@ -72,7 +72,7 @@ jobs:
       # files, and kept in the build cache so it is compiled once.
       - name: The trainer, from the build cache when it was compiled before
         id: trainer
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: engine-trainer/windows-x64
           key: trainer-windows-x64-b11321-v1
@@ -114,7 +114,7 @@ jobs:
           exit ${PIPESTATUS[0]}
 
       - name: The built-in models, from the build cache when they were downloaded before
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ingenium-models
           key: model-${{ hashFiles('desktop_model.json') }}
