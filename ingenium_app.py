@@ -4846,6 +4846,43 @@ def show_seal_in_dock(picture):
             pass
 
 
+def give_bundle_its_seal(picture="ingenium.icns"):
+    """R102: macOS 26 puts the icon an app ships with in a grey rounded square and shrinks it, unless that icon is
+    Apple's rounded square; a custom icon (what Finder's Get Info sets) it leaves as it is, round. So on macOS 26
+    and later the app gives its own bundle the round seal as its custom icon, once for each copy of the app (a
+    new build arrives without one), after macOS has already let it open. The Desktop, the Applications folder and
+    the Dock then show the seal at its full size, as Carpe Diem and the Forge do. Nothing changes on Windows or on
+    an older Mac, and nothing is tried when the app cannot write to its own folder."""
+    if sys.platform != "darwin":
+        return
+    try:
+        if int(os.uname().release.split(".")[0]) < 25:   # Darwin 25 is macOS 26
+            return
+        bundle = os.path.abspath(sys.executable)
+        while bundle and bundle != os.path.dirname(bundle) and not bundle.endswith(".app"):
+            bundle = os.path.dirname(bundle)
+        if not bundle.endswith(".app") or not os.path.isdir(bundle) or not os.access(bundle, os.W_OK):
+            return
+        if os.path.exists(os.path.join(bundle, "Icon\r")):
+            return
+        pic = resource_path(picture)
+        if not os.path.isfile(pic):
+            pic = resource_path("ingenium.png")
+        if not os.path.isfile(pic):
+            return
+        from AppKit import NSImage, NSWorkspace
+        img = NSImage.alloc().initWithContentsOfFile_(pic)
+        if img is None:
+            return
+        ok = NSWorkspace.sharedWorkspace().setIcon_forFile_options_(img, bundle, 0)
+        log_problem("mac: the seal was %s as this copy's own icon (%s)" % ("given" if ok else "refused", bundle))
+    except Exception:
+        try:
+            log_problem("mac: custom icon", sys.exc_info())
+        except Exception:
+            pass
+
+
 def main():
     global _APP_HTML_PATH
     app_html = find_app_html()
@@ -5095,6 +5132,7 @@ def main():
     # accept, so each richer attempt degrades to the plainer one, and only a
     # genuine start failure reports anything.
     show_seal_in_dock('ingenium.png')
+    give_bundle_its_seal()
     _start_monitor_thread(window)
     _store = storage_dir()
     _started = False
