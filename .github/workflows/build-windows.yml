@@ -58,7 +58,7 @@ jobs:
           echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
           echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
           # the build number: the version, the day and this repository's run number
-          echo "INGENIUM_VERSION=4.7.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERSION=4.8.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
           # Windows' own file version allows no part above 65535
           echo "INGENIUM_VERNUM=3.6.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
