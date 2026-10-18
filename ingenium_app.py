@@ -1190,7 +1190,184 @@ def _relay(url, method="GET", headers=None, body=""):
         return {"error": "%s: %s" % (type(e).__name__, e)}
 
 
-class IngeniumApi:
+class _LiteWindows:
+    """R123: an app (Tabula, Abacus, Imago, Scriba, Fontes) in a window of its own, at Ingenium's own address.
+
+    Asked for by the page's export key (the floating window's arrow). The page hands its work across through
+    the app, not through browser storage, since two windows of one app need not share it: open_lite keeps the
+    parcel, the new window takes it (lite_take), and the main window lets the app go only once it is taken
+    (lite_taken), or calls the move off (lite_cancel). If a run ended badly while such a window was open, the
+    next run keeps every app in the main window (why: "safety"), as Carpe Diem does.
+    """
+
+    _LITE_APPS = {"tabula": "Tabula", "abacus": "Abacus", "slides": "Imago", "scriba": "Scriba", "fontes": "Fontes"}
+
+    def open_lite(self, payload):
+        try:
+            p = json.loads(payload) if isinstance(payload, str) else dict(payload or {})
+        except Exception:
+            return {"ok": False, "why": "payload"}
+        if _LITE["blocked"]:
+            return {"ok": False, "why": "safety"}
+        which = str(p.get("which") or "")
+        tok = str(p.get("tok") or "")
+        url = str(p.get("url") or "")
+        if (which not in self._LITE_APPS or not re.match(r"^[A-Za-z0-9_-]{1,40}$", tok)
+                or not re.match(r"^http://127\.0\.0\.1:\d+/", url) or ("#ingapp=" + which) not in url):
+            return {"ok": False, "why": "address"}
+        with _LITE["lock"]:
+            if _LITE["creating"]:
+                return {"ok": False, "why": "busy"}
+            _LITE["creating"] = True
+        try:
+            import webview
+            _LITE["parcels"][tok] = json.dumps({"which": which, "handoff": p.get("handoff")})
+            win = webview.create_window(
+                self._LITE_APPS[which] + " \u00b7 Ingenium", url=url, width=1180, height=840,
+                min_size=(MIN_WIDTH, MIN_HEIGHT), background_color=ACCENT_AMETHYST,
+                confirm_close=False, text_select=True, js_api=self)
+            _LITE["wins"][tok] = win
+            try:
+                win.events.closed += (lambda *a, t=tok: _lite_closed(t))
+            except Exception:
+                pass
+            _lite_mark(True)
+            return {"ok": True}
+        except Exception:
+            log_problem("open_lite(%r)" % (which,), sys.exc_info())
+            _LITE["parcels"].pop(tok, None)
+            return {"ok": False, "why": "window"}
+        finally:
+            with _LITE["lock"]:
+                _LITE["creating"] = False
+
+    def lite_take(self, tok):
+        parcel = _LITE["parcels"].pop(str(tok), None)
+        if parcel is not None:
+            _LITE["taken"].add(str(tok))
+        return parcel
+
+    def lite_taken(self, tok):
+        return str(tok) in _LITE["taken"]
+
+    def lite_cancel(self, tok):
+        tok = str(tok)
+        if tok in _LITE["taken"]:
+            return False
+        _LITE["parcels"].pop(tok, None)
+        self.close_lite(tok)
+        return True
+
+    def close_lite(self, tok):
+        w = _LITE["wins"].get(str(tok))
+        if w is None:
+            return False
+        try:
+            w.destroy()
+        except Exception:
+            log_problem("close_lite", sys.exc_info())
+        return True
+
+    # A window of its own never writes the desk. What it asks of the main window (to show a page, to take a thought
+    # to the chat or to Steps) waits here until the main window takes it in.
+    _LITE_POST_MAX = 20000
+    _LITE_QUEUE_MAX = 200
+
+    def lite_post(self, item):
+        try:
+            text = item if isinstance(item, str) else json.dumps(item)
+            if len(text) > self._LITE_POST_MAX or not isinstance(json.loads(text), dict):
+                return False
+        except Exception:
+            return False
+        with _LITE["lock"]:
+            if len(_LITE["queue"]) >= self._LITE_QUEUE_MAX:
+                return False
+            _LITE["queue"].append(text)
+        return True
+
+    def lite_inbox(self):
+        with _LITE["lock"]:
+            q, _LITE["queue"] = _LITE["queue"], []
+        return json.dumps(q)
+
+    # The parts of the desk every window shares (the notes, the reminders, the thought Inbox, day and night, the
+    # Clepsydra's settings): each window puts what it changed, each takes in what another changed, and the main
+    # window keeps it in the saved desk. Values stay as the page wrote them (JSON text); the app never reads them.
+    _LITE_SYNC = ("notes", "reminders", "parked", "theme", "clep")
+    _LITE_HUB_MAX = 4 * 1024 * 1024
+
+    def lite_hub_put(self, payload):
+        try:
+            if not isinstance(payload, str) or len(payload) > self._LITE_HUB_MAX:
+                return False
+            p = json.loads(payload)
+            keys, by, at = p.get("keys"), str(p.get("by") or "")[:40], p.get("at")
+            if not isinstance(keys, dict) or not isinstance(at, (int, float)):
+                return False
+        except Exception:
+            return False
+        with _LITE["lock"]:
+            for k, v in keys.items():
+                if k in self._LITE_SYNC and isinstance(v, str):
+                    _LITE["seq"] += 1
+                    _LITE["hub"][k] = {"v": v, "by": by, "at": int(at), "seq": _LITE["seq"]}
+        return True
+
+    def lite_hub_get(self, since=0):
+        try:
+            since = int(since or 0)
+        except Exception:
+            since = 0
+        with _LITE["lock"]:
+            out = {k: e for k, e in _LITE["hub"].items() if e["seq"] > since}
+            return json.dumps({"seq": _LITE["seq"], "keys": out})
+
+
+_LITE = {"wins": {}, "parcels": {}, "taken": set(), "blocked": False, "creating": False, "lock": threading.RLock(),
+         "queue": [], "hub": {}, "seq": 0}
+
+
+def _lite_flag():
+    f = _session_flag()
+    return None if f is None else f.with_name("ingenium_lite_windows.flag")
+
+
+def _lite_mark(on):
+    """While any app has a window of its own, a mark beside the session flag says so."""
+    f = _lite_flag()
+    try:
+        if f is None:
+            return
+        if on:
+            f.write_text("1")
+        elif f.exists():
+            f.unlink()
+    except Exception:
+        pass
+
+
+def _lite_closed(tok):
+    _LITE["wins"].pop(tok, None)
+    _LITE["taken"].discard(tok)
+    if not _LITE["wins"]:
+        _lite_mark(False)
+
+
+def _lite_start(prior_bad):
+    """At start: a bad ending while windows of their own were open keeps apps in the main window this run."""
+    f = _lite_flag()
+    try:
+        was = bool(f is not None and f.exists())
+    except Exception:
+        was = False
+    _LITE["blocked"] = bool(was and prior_bad >= 1)
+    if _LITE["blocked"]:
+        log_problem("start: the last run ended badly while an app had a window of its own; apps open in the main window this run")
+    _lite_mark(False)
+
+
+class IngeniumApi(_LiteWindows):
     """JS API exposed to the main window as window.pywebview.api.
 
     Ingenium page asks for two things: file saves (engine bakes, table
@@ -1466,7 +1643,7 @@ class IngeniumApi:
                 self._creating.discard(which)
 
 
-class IngeniumApiSingle:
+class IngeniumApiSingle(_LiteWindows):
     """The API offered by default: no second native window, just file saves."""
 
     def __init__(self, app_url):
@@ -4676,6 +4853,7 @@ def _end_session():
             f.unlink()
     except Exception:
         pass
+    _lite_mark(False)
 
 
 _RP_MONITOR = None
@@ -4948,6 +5126,7 @@ def main():
         pass
 
     _prior_bad = _begin_session()
+    _lite_start(_prior_bad)
     if _prior_bad >= 2:
         # Two runs in a row ended badly. The stored session is the usual
         # suspect: a poisoned save used to survive every reinstall (it lives in
