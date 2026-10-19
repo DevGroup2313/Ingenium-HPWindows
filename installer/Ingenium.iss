@@ -27,7 +27,7 @@
   #define AppIdent "com.yannieforest.ingenium"
 #endif
 #ifndef AppVersion
-  #define AppVersion "5.7"
+  #define AppVersion "5.8"
 #endif
 #ifndef VerNum
   #define VerNum "3.2.0.0"
