@@ -108,6 +108,11 @@ APP_FOLDER = re.sub(r"[^A-Za-z0-9._-]", "", str(_APP_CFG.get("file_name") or "")
 
 # The window title and starting size. The app itself is responsive, so these are
 # just sensible defaults; the window can be resized and maximised freely.
+# 6.0: they are only the smallest first size. The window opens where it was last
+# left (window.json, beside the stored session), and on a first start it takes most
+# of the screen (_window_start). The owner's words (20 October 2026): "it does not
+# expand and stays lock in this compact view which is really annoying because I have
+# big curved screen desktop display".
 WINDOW_TITLE = APP_NAME
 DEFAULT_WIDTH = 1180
 DEFAULT_HEIGHT = 820
@@ -288,7 +293,21 @@ def log_problem(tag, exc_info=None):
         pass
 
 
+# 6.0: one save at a time. pywebview's file dialog keeps the place chosen in one slot
+# per window, so two dialogs asked for at once could hand each other's places back:
+# five packages saved together came out under one another's names (the Forge's
+# crossed Mac, Mac mini, iPhone and Fire packages). The page now asks for one save
+# after another, and this lock makes sure of it here too.
+_SAVE_LOCK = threading.Lock()
+
+
 def save_bytes(win, name, mime, data_b64):
+    """One save at a time: see _SAVE_LOCK."""
+    with _SAVE_LOCK:
+        return _save_bytes_one(win, name, mime, data_b64)
+
+
+def _save_bytes_one(win, name, mime, data_b64):
     """Write an exported file from Python.
 
     A synthetic <a download> click inside a native web view is handed to the
@@ -4769,6 +4788,83 @@ def _page_mark(path):
         return str(int(time.time()))
 
 
+_WINDOW_ASKED = []  # the size the main window was opened at
+
+
+def _window_file():
+    """window.json, beside the web view's stored session"""
+    try:
+        d = storage_dir()
+        return os.path.join(os.path.dirname(d), "window.json") if d else None
+    except Exception:
+        return None
+
+
+def _window_start(webview):
+    """The main window's first size: as it was last left; else most of the screen it opens on."""
+    try:
+        p = _window_file()
+        if p and os.path.isfile(p):
+            with open(p, encoding="utf-8") as fh:
+                o = json.load(fh)
+            w, h = int(o.get("w", 0)), int(o.get("h", 0))
+            if w >= MIN_WIDTH and h >= MIN_HEIGHT:
+                try:  # a size left on a larger display still fits this one
+                    sc = webview.screens[0]
+                    w, h = min(w, int(sc.width)), min(h, int(sc.height))
+                except Exception:
+                    pass
+                return w, h
+    except Exception:
+        log_problem("window: the size it was left at could not be read")
+    try:
+        sc = webview.screens[0]
+        return min(int(sc.width), max(DEFAULT_WIDTH, int(sc.width * 0.86))), min(int(sc.height), max(DEFAULT_HEIGHT, int(sc.height * 0.86)))
+    except Exception:
+        return DEFAULT_WIDTH, DEFAULT_HEIGHT
+
+
+def _window_keep(window, start=None):
+    """Keeps the window's size in window.json, a moment after it last changed.
+
+    The size is kept as it is asked for at the next start. On a Mac the size a window
+    reports takes in its title bar, which the size it is opened at does not, so the
+    difference seen as it first shows is taken off; else it would grow at every start."""
+    st = {"t": None, "dw": 0, "dh": 0}
+
+    def measure():
+        try:
+            if not start or not window.events.shown.wait(20):
+                return
+            time.sleep(0.6)
+            dw, dh = int(window.width) - int(start[0]), int(window.height) - int(start[1])
+            st["dw"], st["dh"] = (dw if 0 <= dw <= 80 else 0), (dh if 0 <= dh <= 80 else 0)
+        except Exception:
+            pass
+    threading.Thread(target=measure, daemon=True).start()
+
+    def save():
+        try:
+            p = _window_file()
+            w, h = int(window.width) - st["dw"], int(window.height) - st["dh"]
+            if p and w >= MIN_WIDTH and h >= MIN_HEIGHT:
+                with open(p, "w", encoding="utf-8") as fh:
+                    json.dump({"w": w, "h": h}, fh)
+        except Exception:
+            pass
+
+    def on_resized(*_a, **_k):
+        if st["t"]:
+            st["t"].cancel()
+        st["t"] = threading.Timer(0.8, save)
+        st["t"].daemon = True
+        st["t"].start()
+    try:
+        window.events.resized += on_resized
+    except Exception:
+        log_problem("window: this web view reports no resizing; its size is not remembered")
+
+
 def _make_window(webview, api, app_url, app_html_path):
     """The main window, in one place so its creation can be guarded.
 
@@ -4786,9 +4882,11 @@ def _make_window(webview, api, app_url, app_html_path):
     made from the page itself, and the native engine. Work saved before is
     restored from the copy the app keeps on disk.
     """
+    start_w, start_h = _window_start(webview)
+    _WINDOW_ASKED[:] = [start_w, start_h]
     common = dict(
-        width=DEFAULT_WIDTH,
-        height=DEFAULT_HEIGHT,
+        width=start_w,
+        height=start_h,
         min_size=(MIN_WIDTH, MIN_HEIGHT),
         background_color=ACCENT_AMETHYST,
         confirm_close=False,
@@ -5171,6 +5269,7 @@ def main():
         api.main_window = window
     except Exception:
         pass
+    _window_keep(window, _WINDOW_ASKED or None)
 
     # ---- load watchdog -----------------------------------------------------
     # A window whose page never paints used to sit amethyst and silent for
