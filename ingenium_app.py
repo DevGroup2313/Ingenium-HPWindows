@@ -5137,9 +5137,7 @@ def give_bundle_its_seal(picture="ingenium.icns"):
         bundle = os.path.abspath(sys.executable)
         while bundle and bundle != os.path.dirname(bundle) and not bundle.endswith(".app"):
             bundle = os.path.dirname(bundle)
-        if not bundle.endswith(".app") or not os.path.isdir(bundle) or not os.access(bundle, os.W_OK):
-            return
-        if os.path.exists(os.path.join(bundle, "Icon\r")):
+        if not bundle.endswith(".app") or not os.path.isdir(bundle):
             return
         pic = resource_path(picture)
         if not os.path.isfile(pic):
@@ -5150,11 +5148,87 @@ def give_bundle_its_seal(picture="ingenium.icns"):
         img = NSImage.alloc().initWithContentsOfFile_(pic)
         if img is None:
             return
-        ok = NSWorkspace.sharedWorkspace().setIcon_forFile_options_(img, bundle, 0)
-        log_problem("mac: the seal was %s as this copy's own icon (%s)" % ("given" if ok else "refused", bundle))
+        if os.access(bundle, os.W_OK) and not os.path.exists(os.path.join(bundle, "Icon\r")):
+            ok = NSWorkspace.sharedWorkspace().setIcon_forFile_options_(img, bundle, 0)
+            log_problem("mac: the seal was %s as this copy's own icon (%s)" % ("given" if ok else "refused", bundle))
+        _seal_shortcuts(bundle, img)
     except Exception:
         try:
             log_problem("mac: custom icon", sys.exc_info())
+        except Exception:
+            pass
+
+
+def _seal_shortcuts(bundle, img):
+    """6.1: the shortcuts to this app on the Desktop (Finder aliases, symbolic links) and copies of it there get the round
+    seal as their own icon too. The owner's words (20 October 2026): "It looks fine on the applications list on the mac
+    and on the Dock but the shortcut on the desktop has the grey look." A shortcut is a file of its own, which macOS 26
+    draws with the app's shipped icon in its grey square; a custom icon on the shortcut itself is left as it is, round.
+    Each one is given the seal once (seal_shortcuts.json, beside the stored session, remembers which)."""
+    from AppKit import NSWorkspace
+    from Foundation import NSURL, NSBundle
+    ws = NSWorkspace.sharedWorkspace()
+    real = os.path.realpath(bundle)
+    try:
+        mine = NSBundle.bundleWithPath_(bundle).bundleIdentifier()
+    except Exception:
+        mine = None
+    rec_path = None
+    try:
+        d = storage_dir()
+        rec_path = os.path.join(os.path.dirname(d), "seal_shortcuts.json") if d else None
+    except Exception:
+        rec_path = None
+    rec = {}
+    try:
+        if rec_path and os.path.isfile(rec_path):
+            with open(rec_path, encoding="utf-8") as fh:
+                rec = json.load(fh) or {}
+    except Exception:
+        rec = {}
+    desk = os.path.expanduser("~/Desktop")
+    if not os.path.isdir(desk):
+        return
+    changed = False
+    for name in sorted(os.listdir(desk)):
+        p = os.path.join(desk, name)
+        try:
+            ours = False
+            if os.path.islink(p):
+                ours = os.path.realpath(p) == real
+            elif name.endswith(".app") and os.path.isdir(p):
+                ours = os.path.realpath(p) == real
+                if not ours and mine:
+                    b = NSBundle.bundleWithPath_(p)
+                    ours = bool(b is not None and b.bundleIdentifier() == mine)
+                if ours and os.path.exists(os.path.join(p, "Icon\r")):
+                    continue
+            elif os.path.isfile(p):
+                url = NSURL.fileURLWithPath_(p)
+                res = NSURL.URLByResolvingAliasFileAtURL_options_error_(url, 1 << 8, None)
+                to = res[0] if isinstance(res, tuple) else res
+                if to is not None and to.path() and os.path.realpath(str(to.path())) != os.path.realpath(p):
+                    ours = os.path.realpath(str(to.path())) == real
+            if not ours:
+                continue
+            st = os.lstat(p)
+            if rec.get(p) == [st.st_ino, int(st.st_mtime)]:
+                continue
+            if ws.setIcon_forFile_options_(img, p, 0):
+                st = os.lstat(p)
+                rec[p] = [st.st_ino, int(st.st_mtime)]
+                changed = True
+                try:
+                    ws.noteFileSystemChanged_(p)
+                except Exception:
+                    pass
+                log_problem("mac: the seal was given to the shortcut " + p)
+        except Exception:
+            log_problem("mac: shortcut icon " + p, sys.exc_info())
+    if changed and rec_path:
+        try:
+            with open(rec_path, "w", encoding="utf-8") as fh:
+                json.dump(rec, fh)
         except Exception:
             pass
 
