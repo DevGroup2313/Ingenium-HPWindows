@@ -122,3 +122,90 @@ SOFTWARE.
    - The LLVM OpenMP runtime (libomp, inside the Windows engine), Apache
      License 2.0 with LLVM Exceptions, https://openmp.llvm.org; its licence
      text travels with the engine as LICENSE-LLVM-OpenMP.
+
+6. Ingenium's eyes (the picture reader inside ingenium.html, from 6.2)
+   Ingenium looks at a picture on the device, with nothing fetched, using
+   these components, each under the Apache License 2.0 (its full text is in
+   licences/Apache-2.0-Qwen3.5.txt). Settings shows the same notices.
+   - TensorFlow.js 4.22.0 (@tensorflow/tfjs, dist/tf.min.js)
+     Copyright 2018-2024 Google LLC. https://github.com/tensorflow/tfjs
+   - MobileNet v2, 1.0, 224 x 224, with its ImageNet class names (as
+     published for @tensorflow-models/mobilenet 2.1.1)
+     Copyright 2019 Google LLC.
+     https://github.com/tensorflow/tfjs-models/tree/master/mobilenet
+     Changed here: the weights are stored in eight bits each; the network
+     itself is unchanged.
+   - Tesseract.js 5.1.1 (dist/tesseract.min.js and dist/worker.min.js)
+     Copyright 2016 Jerome Wu and the Tesseract.js contributors.
+     https://github.com/naptha/tesseract.js
+   - Tesseract.js-core 5.1.1 (Tesseract OCR compiled to WebAssembly)
+     Tesseract: Copyright 2006 Google Inc. and the Tesseract contributors.
+     https://github.com/naptha/tesseract.js-core
+     https://github.com/tesseract-ocr/tesseract
+   - English trained data, 4.0.0_best_int (@tesseract.js-data/eng 1.0.0,
+     from tessdata_best). Copyright Google Inc. and the Tesseract
+     contributors. https://github.com/tesseract-ocr/tessdata_best
+   Bundled inside Tesseract.js's two files, as their own notes list them:
+   regenerator-runtime, Copyright (c) 2014-present Facebook, Inc. (MIT
+   License); buffer, by Feross Aboukhadijeh (MIT License); ieee754, by
+   Feross Aboukhadijeh (BSD 3-Clause License); zlib.js, Copyright 2012
+   imaya (MIT License). Their licences:
+
+   MIT License (regenerator-runtime, buffer, zlib.js; each with its own
+   copyright notice above):
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be included
+   in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   BSD 3-Clause License (ieee754, Copyright (c) 2008, Fair Oaks Labs, Inc.):
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+   1. Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+   2. Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+   3. Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+   IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+   TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+   PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+   TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+7. The fonts of Lector's documents (inside ingenium.html)
+   - Cormorant, by Christian Thalmann (Catharsis Fonts), weights 500, 600
+     and 700 and 500 italic. https://github.com/CatharsisFonts/Cormorant
+   - Cinzel, by Natanael Gama, weight 600.
+     https://github.com/NDISCOVER/Cinzel
+   Each under the SIL Open Font License, Version 1.1
+   (https://openfontlicense.org): the fonts may be used, embedded and
+   redistributed with software, but not sold by themselves. Each font file
+   keeps its copyright notice and licence in its own metadata.

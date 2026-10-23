@@ -1238,6 +1238,10 @@ class _LiteWindows:
             if _LITE["creating"]:
                 return {"ok": False, "why": "busy"}
             _LITE["creating"] = True
+        # 6.2: a window of its own reads the window page (ingenium_window.html, served beside the page by
+        # _start_local_server): the same page without the apps Ingenium carries, the engine's WebAssembly and the kit
+        # store, about a quarter of its size, so it opens about four times sooner
+        url = re.sub(r"/ingenium\.html#", "/ingenium_window.html#", url, count=1)
         try:
             import webview
             _LITE["parcels"][tok] = json.dumps({"which": which, "handoff": p.get("handoff")})
@@ -1264,7 +1268,37 @@ class _LiteWindows:
         parcel = _LITE["parcels"].pop(str(tok), None)
         if parcel is not None:
             _LITE["taken"].add(str(tok))
+            # 6.2: it comes forward, so the app never seems to vanish behind the main window
+            _lite_forward(_LITE["wins"].get(str(tok)))
         return parcel
+
+    # 6.2: the main window's Desk bar keeps a tab for each window of its own: the tab brings that window forward, and its
+    # second key asks the window to send its app back into the main window's desk (lite_cmd "home", read by lite_cmds).
+    def lite_focus(self, tok):
+        w = _LITE["wins"].get(str(tok))
+        if w is None:
+            return False
+        _lite_forward(w)
+        return True
+
+    def lite_cmd(self, tok, cmd):
+        tok, cmd = str(tok), str(cmd)
+        if cmd not in ("home",) or tok not in _LITE["wins"]:
+            return False
+        with _LITE["lock"]:
+            q = _LITE["cmds"].setdefault(tok, [])
+            if cmd not in q:
+                q.append(cmd)
+        return True
+
+    def lite_cmds(self, tok):
+        with _LITE["lock"]:
+            q = _LITE["cmds"].pop(str(tok), [])
+        return json.dumps(q)
+
+    def main_focus(self):
+        _lite_forward(getattr(self, "main_window", None))
+        return True
 
     def lite_taken(self, tok):
         return str(tok) in _LITE["taken"]
@@ -1344,7 +1378,18 @@ class _LiteWindows:
 
 
 _LITE = {"wins": {}, "parcels": {}, "taken": set(), "blocked": False, "creating": False, "lock": threading.RLock(),
-         "queue": [], "hub": {}, "seq": 0}
+         "queue": [], "hub": {}, "seq": 0, "cmds": {}}
+
+
+def _lite_forward(win):
+    """6.2: a window brought to the front (shown, restored if folded into the Dock or the taskbar)."""
+    if win is None:
+        return
+    for name in ("restore", "show"):
+        try:
+            getattr(win, name)()
+        except Exception:
+            pass
 
 
 def _lite_flag():
@@ -1369,6 +1414,10 @@ def _lite_mark(on):
 def _lite_closed(tok):
     _LITE["wins"].pop(tok, None)
     _LITE["taken"].discard(tok)
+    with _LITE["lock"]:
+        _LITE["cmds"].pop(tok, None)
+        if len(_LITE["queue"]) < 200:
+            _LITE["queue"].append(json.dumps({"kind": "gone", "tok": str(tok)}))
     if not _LITE["wins"]:
         _lite_mark(False)
 
@@ -2404,6 +2453,19 @@ def _engine_error_from_log(lines):
     return ""
 
 
+# 6.2: past this much memory the engine keeps it in eight bits (half the room); cleared for the session when an engine
+# refuses it, so every later start goes without
+_KVQ_AT = 32768
+_KVQ_OK = [True]
+
+
+def _engine_kvq(n_ctx):
+    try:
+        return _KVQ_OK[0] and int(n_ctx) > _KVQ_AT
+    except Exception:
+        return False
+
+
 def _engine_launch(path, n_ctx, mmp, use_gpu, drafter=None):
     """Start llama-server. Returns (proc, port) or raises."""
     d = _engine_dir()
@@ -2415,7 +2477,10 @@ def _engine_launch(path, n_ctx, mmp, use_gpu, drafter=None):
             pass
     port = _engine_free_port()
     args = [exe, "-m", path, "--host", "127.0.0.1", "--port", str(port), "-c", str(n_ctx),
-            "-np", "1", "--jinja", "--no-webui"]
+            "-np", "1", "--jinja", "--no-webui", "--cache-reuse", "256"]
+    # 6.2: a long memory in eight bits, with the flash attention it needs
+    if _engine_kvq(n_ctx):
+        args += ["-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"]
     # With a graphics chip the engine fits as many layers on it as its memory
     # holds (its own --fit, on by default); without one, none are sent there.
     if not use_gpu:
@@ -2473,7 +2538,7 @@ def _engine_start(model_id, n_ctx=8192, mmproj_id=None, gpu=True):
     with _ENGINE_LOCK:
         _ENGINE.update(proc=proc, port=port, key=key, model_id=str(model_id), args=(path, n_ctx, mmp, drafter),
                        state="loading", error="", note="", log=[], started=time.time(),
-                       gpu=gpu_name if use_gpu else "", draft=bool(drafter))
+                       gpu=gpu_name if use_gpu else "", draft=bool(drafter), kvq=_engine_kvq(n_ctx))
     return {"ok": True, "port": port}
 
 
@@ -2490,6 +2555,25 @@ def _engine_status():
     if code is not None:
         err = _engine_error_from_log(whole) or ("The engine stopped (code %s)." % code)
         log_problem("engine stopped: %s\n  %s" % (err, "\n  ".join(tail)))
+        # 6.2: an engine that cannot keep its memory in eight bits (or lacks flash attention) starts again without it,
+        # at the same memory; every later start this session goes without
+        if state == "loading":
+            with _ENGINE_LOCK:
+                args = _ENGINE["args"] if _ENGINE["proc"] is p else None
+                kvq = bool(_ENGINE.get("kvq"))
+            if args and kvq:
+                _KVQ_OK[0] = False
+                try:
+                    proc, port2, _a = _engine_launch(args[0], args[1], args[2], bool(gpu), args[3] if len(args) > 3 else None)
+                    with _ENGINE_LOCK:
+                        if _ENGINE["proc"] is p:
+                            _ENGINE.update(proc=proc, port=port2, state="loading", log=[], kvq=False,
+                                           note="This computer's engine could not keep a long memory in eight bits, so it keeps it in full (it needs more room).",
+                                           started=time.time())
+                    return {"state": "loading", "port": port2, "model_id": model_id, "log": [],
+                            "seconds": 0.0, "note": _ENGINE["note"]}
+                except Exception:
+                    log_problem("engine: the retry without the eight-bit memory could not start", sys.exc_info())
         # R73: a speed-up file that the engine cannot use is no reason to give
         # up either: load the model again without it.
         if state == "loading":
@@ -4619,6 +4703,60 @@ def _big_gc(live):
     return gone
 
 
+# 6.2: the page a window of its own reads. A window of its own shows one app and the side keys; it never keeps the apps
+# Ingenium carries in the library (r120 skips it), never runs a model in the page and never makes kits, so the blocks
+# that hold those (about three quarters of the page) are left out of it. Each block is removed whole, so the page's own
+# checks see it absent, as in a copy that never carried it.
+_WINDOW_DROP = ("ing-builtin-cd", "ing-builtin-forge", "ing-builtin-inkwell", "ingenium-kit-bundle",
+                "ingenium-engine-wasm", "ingenium-engine-compat-wasm", "ing-eyes")
+_WINDOW_CACHE = {"key": None, "data": None}
+
+
+def _window_page(html_path):
+    try:
+        st = os.stat(html_path)
+        key = (st.st_mtime_ns, st.st_size)
+        if _WINDOW_CACHE["key"] == key:
+            return _WINDOW_CACHE["data"]
+        text = open(html_path, "rb").read()
+        for ident in _WINDOW_DROP:
+            text = re.sub(rb'<script\b[^>]*\bid="' + ident.encode() + rb'"[^>]*>[^<]*</script>', b"", text, count=1)
+        _WINDOW_CACHE["key"], _WINDOW_CACHE["data"] = key, text
+        return text
+    except Exception:
+        log_problem("window page", sys.exc_info())
+        return None
+
+
+# 6.2: the page as the window first reads it: what is carried for later stays on this side until the page asks for it
+_QUICK_DEFER = ("ing-builtin-cd", "ing-builtin-forge", "ing-builtin-inkwell", "ingenium-kit-bundle",
+                "ingenium-engine-wasm", "ingenium-engine-compat-wasm", "ing-eyes")
+_QUICK_CACHE = {"key": None, "page": None, "parts": {}}
+
+
+def _quick_page(html_path):
+    """(page, parts): the page with the carried blocks left empty, each naming where it is, and the blocks themselves."""
+    try:
+        st = os.stat(html_path)
+        key = (st.st_mtime_ns, st.st_size)
+        if _QUICK_CACHE["key"] == key:
+            return _QUICK_CACHE["page"], _QUICK_CACHE["parts"]
+        text = open(html_path, "rb").read()
+        parts = {}
+        for ident in _QUICK_DEFER:
+            m = re.search(rb'(<script\b[^>]*\bid="' + re.escape(ident.encode()) + rb'"[^>]*)>([^<]*)</script>', text)
+            if not m or len(m.group(2)) < 1024:
+                continue
+            parts[ident] = m.group(2)
+            tag = m.group(1) + b' data-defer="/_payload/' + ident.encode() + b'" data-defer-bytes="' + str(len(m.group(2))).encode() + b'">'
+            text = text[:m.start()] + tag + b"</script>" + text[m.end():]
+        _QUICK_CACHE.update(key=key, page=text, parts=parts)
+        return text, parts
+    except Exception:
+        log_problem("quick page", sys.exc_info())
+        return None, {}
+
+
 def _start_local_server(directory, html_name=None):
     """Serve `directory` on 127.0.0.1, quietly, in a daemon thread. Returns the
     port, or raises. Loopback only: nothing is exposed off this machine, and
@@ -4665,7 +4803,32 @@ def _start_local_server(directory, html_name=None):
                 http.server.SimpleHTTPRequestHandler.send_header(self, "Expires", "0")
             return http.server.SimpleHTTPRequestHandler.end_headers(self)
 
+        # 6.2 (app_guard_62.py): the app's own address answers only a request that names it, as the app's window does
+        def _ing_host_ok(self):
+            port = self.server.server_address[1]
+            host = (self.headers.get("Host") or "").strip().lower()
+            if host in ("127.0.0.1:%d" % port, "localhost:%d" % port, "[::1]:%d" % port):
+                return True
+            body = b"This address answers only Ingenium's own window."
+            try:
+                self.send_response(421)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(body)
+            except Exception:
+                pass
+            return False
+
+        def do_HEAD(self):
+            if not self._ing_host_ok():
+                return
+            return http.server.SimpleHTTPRequestHandler.do_HEAD(self)
+
         def do_POST(self):
+            if not self._ing_host_ok():
+                return
             if self.path.split("?", 1)[0] == "/_relay":
                 return _relay_stream(self)
             self.send_response(404)
@@ -4673,6 +4836,8 @@ def _start_local_server(directory, html_name=None):
             self.end_headers()
 
         def do_GET(self):
+            if not self._ing_host_ok():
+                return
             path = self.path.split("?", 1)[0]
             if path == "/_engine/has" or path.startswith("/_engine/part/"):
                 data = b"0"
@@ -4700,9 +4865,53 @@ def _start_local_server(directory, html_name=None):
                 except Exception:
                     log_problem("engine route failed", sys.exc_info())
                 return
+            if path == "/ingenium_window.html" and html_path:
+                data = _window_page(html_path)
+                if data is None:
+                    return http.server.SimpleHTTPRequestHandler.do_GET(self)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                try:
+                    self.wfile.write(data)
+                except Exception:
+                    pass
+                return
             if path.startswith("/_models/"):
                 self._serve_model(path.rsplit("/", 1)[-1])
                 return
+            # 6.2: the window's own load of the page reads the quick page; a part is given when the page asks for it
+            if html_path and path.startswith("/_payload/"):
+                page, parts = _quick_page(html_path)
+                data = parts.get(path.rsplit("/", 1)[-1])
+                if data is None:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=us-ascii")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                try:
+                    self.wfile.write(data)
+                except Exception:
+                    pass
+                return
+            if (html_path and path == "/" + os.path.basename(html_path) and "full=1" not in self.path
+                    and (self.headers.get("Sec-Fetch-Dest") or "").lower() == "document"):
+                page, parts = _quick_page(html_path)
+                if page is not None:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(page)))
+                    self.end_headers()
+                    try:
+                        self.wfile.write(page)
+                    except Exception:
+                        pass
+                    return
             return http.server.SimpleHTTPRequestHandler.do_GET(self)
 
         def _serve_model(self, mid):
