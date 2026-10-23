@@ -2501,6 +2501,10 @@ def _engine_launch(path, n_ctx, mmp, use_gpu, drafter=None):
     return proc, port, args
 
 
+# 6.3 (app_ctx_63.py): the longest memory a model may be given, when it was trained for it
+_ING_CTX_MAX = 1048576
+
+
 def _engine_start(model_id, n_ctx=8192, mmproj_id=None, gpu=True):
     """Start the engine with a model the shell knows (linked in place or kept
     in the app's folder). Returns at once; _engine_status follows the load."""
@@ -2514,7 +2518,7 @@ def _engine_start(model_id, n_ctx=8192, mmproj_id=None, gpu=True):
     if mmproj_id and not (mmp and os.path.isfile(mmp)):
         mmp = None
     try:
-        n_ctx = max(512, min(int(n_ctx or 8192), 262144))
+        n_ctx = max(512, min(int(n_ctx or 8192), _ING_CTX_MAX))
     except Exception:
         n_ctx = 8192
     gpu_name = _engine_gpu(d)

@@ -209,3 +209,39 @@ SOFTWARE.
    (https://openfontlicense.org): the fonts may be used, embedded and
    redistributed with software, but not sold by themselves. Each font file
    keeps its copyright notice and licence in its own metadata.
+
+8. CodeMirror 6 (the code editor inside ingenium.html, from 6.3), with its
+   parsers (Lezer), https://codemirror.net, https://lezer.codemirror.net
+   codemirror 6.0.2; @codemirror/autocomplete 6.20.4, commands 6.11.1,
+   language 6.13.1, legacy-modes 6.5.5, lint 6.9.7, merge 6.12.3, search
+   6.7.2, state 6.7.6, view 6.43.15, and the languages cpp 6.0.3, css 6.3.1,
+   html 6.4.12, java 6.0.2, javascript 6.2.5, json 6.0.2, markdown 6.5.2,
+   php 6.0.2, python 6.2.1, rust 6.0.2, sql 6.10.0, xml 6.1.0, yaml 6.1.3;
+   @lezer/common 1.5.4, highlight 1.2.5, lr 1.4.11, and the grammars cpp
+   1.1.6, css 1.3.9, html 1.3.13, java 1.1.5, javascript 1.5.6, json 1.0.3,
+   markdown 1.8.1, php 1.0.6, python 1.1.19, rust 1.0.3, xml 1.0.6, yaml
+   1.0.4; style-mod 4.1.4, w3c-keyname 2.2.8, crelt 1.0.7 and
+   @marijn/find-cluster-break 1.0.4. Each package names its own years.
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (C) 2016-2024 by Marijn Haverbeke <marijn@haverbeke.berlin> and
+others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
