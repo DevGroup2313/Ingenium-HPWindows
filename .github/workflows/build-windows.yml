@@ -142,6 +142,7 @@ jobs:
       - name: Build the app (one portable file, and the folder the installer carries)
         run: |
           python tools/stamp_build.py ingenium.html "$INGENIUM_VERSION"
+          echo "Fingerprint (SHA-256) of the page inside this app: $(sha256sum ingenium.html | cut -d' ' -f1)" | tee -a "$GITHUB_STEP_SUMMARY"
           python -m PyInstaller --noconfirm --clean ingenium_win.spec
           INGENIUM_ONEDIR=1 python -m PyInstaller --noconfirm --clean ingenium_win.spec
           test -f "dist/$APP_FILE.exe"
