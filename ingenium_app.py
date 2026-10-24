@@ -820,8 +820,17 @@ _GG_FMT = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?
 TRAIN_SIZES = {  # name: (layers, width, heads, feed-forward width)
     "tiny": (4, 128, 4, 352),
     "small": (6, 256, 8, 704),
+    # 6.5 (app_train_65.py): for a strong computer and much more text (about 16 and 41 million numbers)
+    "medium": (8, 384, 6, 1024),
+    "large": (12, 512, 8, 1408),
 }
 TRAIN_VOCAB = 2048
+# 6.5: the learning rate at the start and at the end, for a training from zero and for one that goes on (the trainer starts
+# its optimiser afresh, so that one starts gently); measured for each size on 150,000 characters (source/rig/train_sizes.txt)
+TRAIN_LR = {"tiny": (1e-4, 1e-5), "small": (6e-5, 6e-6), "medium": (4e-5, 4e-6), "large": (3e-5, 3e-6), "base": (1e-6, 1e-7)}
+TRAIN_LR_MORE = {"tiny": (3e-5, 3e-6), "small": (2e-5, 2e-6), "medium": (1.5e-5, 1.5e-6), "large": (1e-5, 1e-6), "base": (5e-7, 5e-8)}
+# the batch is the context: llama.cpp rounds a context up to 256 tokens, and trains no K or V projection when a batch is smaller
+TRAIN_CTX = 256
 _TRAINER_EXE = "llama-finetune.exe" if sys.platform.startswith("win") else "llama-finetune"
 
 
@@ -974,6 +983,163 @@ def _new_model(out_path, tok_kv, size="tiny", name="My first model", ctx=256, se
     return total
 
 
+# ---------------------------------------------------------------- 6.6: a model you have, trained further (app_studio_65.py)
+_GGUF_FIXED = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
+_GGUF_WIDENS = {0: "F32", 1: "F16", 8: "Q8_0", 30: "BF16"}   # the forms widened exactly to 32 bits
+
+
+def _gguf_skip(b, p, t):
+    if t in _GGUF_FIXED:
+        return p + _GGUF_FIXED[t]
+    if t == 8:
+        return p + 8 + struct.unpack_from("<Q", b, p)[0]
+    if t == 9:
+        et, n = struct.unpack_from("<IQ", b, p)
+        p += 12
+        if et in _GGUF_FIXED:
+            return p + _GGUF_FIXED[et] * n
+        for _ in range(n):
+            p = _gguf_skip(b, p, et)
+        return p
+    raise ValueError("a setting of a kind this does not know (%d)" % t)
+
+
+def _gguf_read(path):
+    """A GGUF file's settings (raw, in order), its tensors (name, shape, form, place) and where their numbers begin."""
+    with open(path, "rb") as f:
+        head = f.read(64 << 20)
+    if head[:4] != b"GGUF":
+        raise ValueError("not a GGUF model file")
+    ver, n_t, n_kv = struct.unpack_from("<IQQ", head, 4)
+    p, kvs, sets, align = 24, [], {}, 32
+    for _ in range(n_kv):
+        k0 = p
+        n = struct.unpack_from("<Q", head, p)[0]
+        key = head[p + 8:p + 8 + n].decode("utf-8", "replace")
+        p += 8 + n
+        t = struct.unpack_from("<I", head, p)[0]
+        v0 = p + 4
+        p = _gguf_skip(head, v0, t)
+        kvs.append((key, t, head[k0:v0], head[v0:p]))
+        if t == 8:
+            sets[key] = head[v0 + 8:p].decode("utf-8", "replace")
+        elif t in (4, 5, 10):
+            sets[key] = struct.unpack_from({4: "<I", 5: "<i", 10: "<Q"}[t], head, v0)[0]
+        if key == "general.alignment" and t == 4:
+            align = sets[key]
+    tensors = []
+    for _ in range(n_t):
+        n = struct.unpack_from("<Q", head, p)[0]
+        name = head[p + 8:p + 8 + n]
+        p += 8 + n
+        nd = struct.unpack_from("<I", head, p)[0]
+        dims = struct.unpack_from("<%dQ" % nd, head, p + 4)
+        p += 4 + 8 * nd
+        typ, off = struct.unpack_from("<IQ", head, p)
+        p += 12
+        count = 1
+        for d in dims:
+            count *= d
+        tensors.append((name, dims, typ, off, count))
+    return {"version": ver, "kvs": kvs, "settings": sets, "tensors": tensors, "align": align,
+            "data": (p + align - 1) // align * align}
+
+
+def _gguf_summary(path):
+    """What a model is, and whether llama.cpp's trainer can train it here: a Llama-shaped model in 32, 16 or 8 bits."""
+    try:
+        g = _gguf_read(path)
+    except Exception as e:
+        return {"trainable": False, "why": "Its file could not be read: %s" % e}
+    sets = g["settings"]
+    arch = sets.get("general.architecture", "")
+    params = sum(t[4] for t in g["tensors"])
+    forms = sorted({_GGUF_WIDENS.get(t[2], "type %d" % t[2]) for t in g["tensors"]})
+    emb = [t for t in g["tensors"] if t[0] == b"token_embd.weight"]
+    out = {"arch": arch, "name": sets.get("general.name", ""), "params": params, "forms": forms, "trainable": True, "why": "",
+           "vocab": int(emb[0][1][1]) if emb and len(emb[0][1]) > 1 else None}
+    if arch != "llama":
+        out.update(trainable=False, why="llama.cpp's trainer trains Llama-shaped models; this one is %s." % (arch or "of another shape"))
+    elif any(t[2] not in _GGUF_WIDENS for t in g["tensors"]):
+        out.update(trainable=False, why="Its numbers are packed smaller than 8 bits, which cannot be widened without loss: choose its 16-bit (F16) or 8-bit (Q8_0) file.")
+    return out
+
+
+def _gguf_to_f32(src, dst, progress=None):
+    """The same model with every tensor in 32-bit numbers: exact from F16 and BF16, and from Q8_0 its own values."""
+    g = _gguf_read(src)
+    align = g["align"]
+    out = bytearray(b"GGUF") + struct.pack("<IQQ", g["version"], len(g["tensors"]), len(g["kvs"]))
+    for key, t, kraw, vraw in g["kvs"]:
+        out += kraw + (struct.pack("<I", 0) if key == "general.file_type" and t == 4 else vraw)
+    noff, places = 0, []
+    for name, dims, typ, off, count in g["tensors"]:
+        out += struct.pack("<Q", len(name)) + name + struct.pack("<I", len(dims)) + struct.pack("<%dQ" % len(dims), *dims)
+        out += struct.pack("<IQ", 0, noff)
+        places.append(noff)
+        noff += (count * 4 + align - 1) // align * align
+    out += b"\0" * ((align - len(out) % align) % align)
+    total = sum(t[4] for t in g["tensors"]) or 1
+    done = 0
+    with open(src, "rb") as f, open(dst, "wb") as w:
+        w.write(out)
+        for name, dims, typ, off, count in g["tensors"]:
+            f.seek(g["data"] + off)
+            left = count
+            while left:
+                if typ == 8:   # Q8_0: blocks of 32 numbers, a 16-bit scale and 32 signed bytes
+                    k = min(left, 1 << 15)
+                    blk = f.read(34 * (k // 32))
+                    vals = []
+                    for i in range(0, len(blk), 34):
+                        d = struct.unpack_from("<e", blk, i)[0]
+                        vals.extend([d * q for q in struct.unpack_from("<32b", blk, i + 2)])
+                    chunk = struct.pack("<%df" % k, *vals)
+                else:
+                    k = min(left, 1 << 20)
+                    if typ == 0:
+                        chunk = f.read(4 * k)
+                    elif typ == 1:
+                        chunk = struct.pack("<%df" % k, *struct.unpack("<%de" % k, f.read(2 * k)))
+                    else:   # BF16: the upper half of a 32-bit number
+                        h = f.read(2 * k)
+                        chunk = bytearray(4 * k)
+                        chunk[2::4] = h[0::2]
+                        chunk[3::4] = h[1::2]
+                w.write(chunk)
+                left -= k
+                done += k
+                if progress:
+                    progress(done / total)
+            w.write(b"\0" * ((count * 4 + align - 1) // align * align - count * 4))
+    return total
+
+
+def _train_need_gb(params):
+    """The memory a training takes: the weights, their gradients and the optimiser's two moments, 4 bytes each, and room."""
+    return round(params * 16 / 1e9 + 0.6, 1)
+
+
+def _train_bases():
+    """The models on this computer that can be trained further, with what each needs."""
+    ram = None
+    try:
+        ram = _read_device_info().get("ramGB")
+    except Exception:
+        pass
+    out = []
+    for mid, path in sorted(_MODEL_PATHS.items()):
+        if not os.path.isfile(path):
+            continue
+        info = _gguf_summary(path)
+        meta = _MODEL_META.get(mid) or {}
+        need = _train_need_gb(info.get("params") or 0)
+        out.append({"id": mid, "name": meta.get("name") or info.get("name") or os.path.basename(path), "params": info.get("params"),
+                    "forms": info.get("forms"), "trainable": bool(info.get("trainable")), "why": info.get("why", ""),
+                    "needGB": need, "ramGB": ram, "fits": ram is None or need <= ram * 0.7, "trained": bool(meta.get("trained"))})
+    return {"ok": True, "models": out, "ramGB": ram}
+
+
 _TRAIN = {"state": "idle"}
 _TRAIN_LOCK = threading.Lock()
 _TRAIN_PROC = [None]
@@ -1041,6 +1207,14 @@ def _train_start(spec):
     passes = max(1, min(60, int(spec.get("passes") or 8)))
     name = re.sub(r"[\r\n]+", " ", str(spec.get("name") or "My first model"))[:60]
     more = str(spec.get("from_model") or "")
+    base = "" if more else str(spec.get("base") or "")
+    if base:
+        if not os.path.isfile(_MODEL_PATHS.get(base, "")):
+            return {"ok": False, "error": "The model to start from is not on this computer."}
+        info = _gguf_summary(_MODEL_PATHS[base])
+        if not info.get("trainable"):
+            return {"ok": False, "error": info.get("why") or "That model cannot be trained here."}
+        passes = max(1, min(5, int(spec.get("passes") or 1)))
     if more and not os.path.isfile(_MODEL_PATHS.get(more, "")):
         return {"ok": False, "error": "The model to train further is not on this computer."}
     md = _models_dir()
@@ -1060,19 +1234,25 @@ def _train_start(spec):
         _TRAIN.update({"state": "running", "phase": "preparing", "id": tid, "name": name, "size": size, "passes": passes,
                        "pass": 0, "frac": 0.0, "loss": None, "val": None, "acc": None, "history": [], "eta": None,
                        "started": time.time(), "chars": len(text), "more": bool(more), "error": "", "cancel": False})
-    threading.Thread(target=_train_run, args=(exe, work, size, passes, name, more), daemon=True).start()
+    threading.Thread(target=_train_run, args=(exe, work, size, passes, name, more, base), daemon=True).start()
     return {"ok": True, "id": tid}
 
 
-def _train_run(exe, work, size, passes, name, more):
+def _train_run(exe, work, size, passes, name, more, base=""):
     try:
         start = work / "start.gguf"
         out = work / "trained.gguf"
-        if more:
+        if base:
+            # 6.6: widened to 32-bit numbers, which the trainer needs; the model it came from stays as it was
+            _train_set(phase="widening", nvocab=_gguf_summary(_MODEL_PATHS[base]).get("vocab"))
+            params = _gguf_to_f32(_MODEL_PATHS[base], str(start), progress=lambda f: _train_set(frac=0.0, widen=round(f, 2)))
+            size = "base"
+            lr0, lr1 = TRAIN_LR["base"]
+        elif more:
             shutil.copyfile(_MODEL_PATHS[more], start)
             # the trainer starts its optimiser afresh, so it starts gently
             size = (_MODEL_META.get(more) or {}).get("size") or size
-            lr0, lr1 = (2e-5, 2e-6) if size == "small" else (3e-5, 3e-6)
+            lr0, lr1 = TRAIN_LR_MORE.get(size, TRAIN_LR_MORE["tiny"])
             params = (_MODEL_META.get(more) or {}).get("params")
         else:
             _train_set(phase="vocabulary")
@@ -1082,10 +1262,10 @@ def _train_run(exe, work, size, passes, name, more):
             # measured on 60,000 characters of a novel: from 5e-4 the loss
             # jumped back up in the second pass; from 1e-4 (tiny) and 6e-5
             # (small) it fell in every pass and the held-back loss ended lowest
-            lr0, lr1 = (6e-5, 6e-6) if size == "small" else (1e-4, 1e-5)
+            lr0, lr1 = TRAIN_LR.get(size, TRAIN_LR["tiny"])
         _train_set(phase="training", params=params)
         threads = max(1, (os.cpu_count() or 2) - 1)
-        args = [exe, "-m", str(start), "--file", str(work / "text.txt"), "-c", "128", "-b", "128", "-ub", "128",
+        args = [exe, "-m", str(start), "--file", str(work / "text.txt"), "-c", str(TRAIN_CTX), "-b", str(TRAIN_CTX), "-ub", str(TRAIN_CTX),
                 "-epochs", str(passes), "-lr", str(lr0), "-lr-min", str(lr1), "-decay-epochs", str(passes),
                 "-t", str(threads), "-o", str(out)]
         kw = {}
@@ -1148,6 +1328,8 @@ def _train_run(exe, work, size, passes, name, more):
         prev = _MODEL_META.get(mid) or {}
         _MODEL_META[mid] = {"trained": True, "name": name, "size": size, "params": params,
                             "passes": int(prev.get("passes") or 0) + passes, "chars": _TRAIN.get("chars")}
+        if base or prev.get("base"):
+            _MODEL_META[mid]["base"] = prev.get("base") or (_MODEL_META.get(base) or {}).get("name") or os.path.basename(_MODEL_PATHS.get(base, ""))
         _save_models_index()
         shutil.rmtree(work, ignore_errors=True)
         _train_set(state="done", phase="", frac=1.0, eta=0,
@@ -1493,6 +1675,9 @@ class IngeniumApi(_LiteWindows):
     def train_available(self):
         return _train_available()
 
+    def train_bases(self):
+        return _train_bases()
+
     def train_start(self, spec):
         return _train_start(spec)
 
@@ -1739,6 +1924,9 @@ class IngeniumApiSingle(_LiteWindows):
     # R78: training a small model from zero
     def train_available(self):
         return _train_available()
+
+    def train_bases(self):
+        return _train_bases()
 
     def train_start(self, spec):
         return _train_start(spec)
