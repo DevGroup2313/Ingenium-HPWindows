@@ -1,0 +1,148 @@
+# INGENIUM  |  Copyright (c) 2026 Yannie D. Forest. All rights reserved.
+# NO LICENCE IS GRANTED. See LICENCE.txt.
+#
+# 24 October 2026: the owner's words, "Ingenium keeps on crashing before
+# opening on my windows laptop" and the Forge, after installing, "says that the
+# file has moved". The build's own tests start each app on a GitHub computer
+# where Microsoft Defender is switched off. This check makes the computer more
+# like a laptop at home first: Defender's real-time and cloud protection on,
+# GitHub's exclusions taken away, each installer downloaded from the Releases
+# page with the mark Windows puts on a download. Then each app is installed and
+# opened the way a person opens it (Ingenium from its Start menu entry, the
+# Forge from its Start menu entry), and everything Windows and the app wrote is
+# shown: Defender's findings, the app's own log, Windows' error records.
+# It publishes nothing.
+name: Windows, as on a laptop at home
+
+on:
+  push:
+    paths:
+      - '.github/workflows/windows-home-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [ingenium, forge]
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - name: Defender as at home (real-time and cloud protection on, no exclusions)
+        run: |
+          $p = Get-MpPreference
+          "Before: real-time off $($p.DisableRealtimeMonitoring); cloud (MAPS) $($p.MAPSReporting); samples $($p.SubmitSamplesConsent); exclusions $($p.ExclusionPath -join ', ')"
+          foreach ($x in @($p.ExclusionPath)) { if ($x) { Remove-MpPreference -ExclusionPath $x -ErrorAction SilentlyContinue } }
+          foreach ($x in @($p.ExclusionProcess)) { if ($x) { Remove-MpPreference -ExclusionProcess $x -ErrorAction SilentlyContinue } }
+          Set-MpPreference -DisableRealtimeMonitoring $false -DisableBehaviorMonitoring $false -DisableIOAVProtection $false `
+            -DisableBlockAtFirstSeen $false -DisableArchiveScanning $false -DisableScriptScanning $false `
+            -MAPSReporting Advanced -SubmitSamplesConsent SendSafeSamples -ErrorAction Continue
+          & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -SignatureUpdate | Select-Object -Last 2
+          $s = Get-MpComputerStatus; $p = Get-MpPreference
+          "After: mode $($s.AMRunningMode); real-time $($s.RealTimeProtectionEnabled); on access $($s.OnAccessProtectionEnabled); behaviour $($s.BehaviorMonitorEnabled); IOAV $($s.IoavProtectionEnabled); cloud (MAPS) $($p.MAPSReporting); definitions $($s.AntivirusSignatureVersion); exclusions left: $($p.ExclusionPath -join ', ')"
+          $ed = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue
+          "WebView2 runtime: $($ed.pv); Windows $([Environment]::OSVersion.VersionString)"
+          "T0=$((Get-Date).ToString('o'))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Download the installer from the Releases page, as a browser would
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dl = Join-Path $env:USERPROFILE 'Downloads'
+          New-Item -ItemType Directory -Force $dl | Out-Null
+          if ('${{ matrix.app }}' -eq 'ingenium') { $url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/latest/Ingenium-Setup.exe"; $name = 'Ingenium-Setup.exe' }
+          else { $url = 'https://github.com/DevGroup2313/Forge-windows/releases/download/the-forge-windows/The-Forge-Windows-Setup.exe'; $name = 'The-Forge-Windows-Setup.exe' }
+          $f = Join-Path $dl $name
+          try { Invoke-WebRequest -Uri $url -OutFile $f -MaximumRetryCount 4 -RetryIntervalSec 5 }
+          catch {
+            "Plain download refused ($($_.Exception.Message)); asking with the build's key"
+            if ('${{ matrix.app }}' -eq 'ingenium') { gh release download latest -R $env:GITHUB_REPOSITORY -p $name -D $dl --clobber }
+            else { gh release download the-forge-windows -R DevGroup2313/Forge-windows -p $name -D $dl --clobber }
+          }
+          if (-not (Test-Path $f)) { Write-Error "The installer could not be downloaded."; exit 1 }
+          # the mark of the web, as Edge or Chrome leaves on a download
+          Set-Content -Path $f -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3`r`nReferrerUrl=https://github.com/`r`nHostUrl=$url"
+          Start-Sleep -Seconds 20
+          "Downloaded $name, $((Get-Item $f).Length) bytes, SHA-256 $((Get-FileHash $f).Hash.ToLower()); still there after 20 s: $(Test-Path $f)"
+          "SETUP=$f" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install it, as a person would (the installer's own pages, silently)
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'setup.log'
+          $p = Start-Process -FilePath $env:SETUP -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/LOG=$log" -PassThru
+          $null = $p.Handle
+          $null = $p.WaitForExit(900000)
+          "Installer exit code: $($p.ExitCode)"
+          Start-Sleep -Seconds 30
+          if ('${{ matrix.app }}' -eq 'ingenium') { $dir = Join-Path $env:LOCALAPPDATA 'Programs\Ingenium'; $exe = Join-Path $dir 'Ingenium.exe'; $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Ingenium.lnk' }
+          else { $dir = Join-Path $env:LOCALAPPDATA 'Programs\The Forge'; $exe = Join-Path $dir 'The Forge.exe'; $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'The Forge.lnk' }
+          $ws = New-Object -ComObject WScript.Shell
+          $target = if (Test-Path $lnk) { $ws.CreateShortcut($lnk).TargetPath } else { '(no Start menu entry)' }
+          "Program: $exe exists $(Test-Path $exe)"
+          "Start menu entry: $lnk -> $target; the target exists: $(if ($target -and $target -notlike '(*') { Test-Path $target } else { $false })"
+          $files = Get-ChildItem $dir -Recurse -File -ErrorAction SilentlyContinue
+          "Program folder: $($files.Count) files, $([math]::Round((($files | Measure-Object Length -Sum).Sum) / 1MB, 1)) MB"
+          @("DIR=$dir", "EXE=$exe", "LNK=$lnk") | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "--- the installer's log (last lines)"; Get-Content $log -Tail 25
+
+      - name: Open it from its Start menu entry, twice, and read what it wrote
+        run: |
+          function ReadText([string]$path) { try { $fs = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite'); try { (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() } } catch { '' } }
+          if ('${{ matrix.app }}' -eq 'ingenium') { $logs = @((Join-Path $env:DIR 'ingenium_crash.log'), (Join-Path $env:DIR 'ingenium_diag.txt'), (Join-Path $env:USERPROFILE 'ingenium_crash.log')); $name = 'Ingenium'; $ready = 'load: verified, page booted|load: page answered but NOT verified|load: probe could not reach' }
+          else { $logs = @((Join-Path $env:LOCALAPPDATA 'TheForge\the_forge_crash.log')); $name = 'The Forge'; $ready = 'start: page (NOT )?ready' }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          foreach ($round in 1, 2) {
+            "=== Opening $name, round $round (from $env:LNK)"
+            $t = Get-Date
+            Start-Process -FilePath $env:LNK
+            $seen = $false
+            for ($i = 0; $i -lt 150; $i++) {
+              Start-Sleep -Seconds 1
+              $all = ($logs | ForEach-Object { ReadText $_ }) -join "`n"
+              if ([regex]::Matches($all, $ready).Count -ge $round) { $seen = $true; break }
+            }
+            Start-Sleep -Seconds 5
+            $procs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) })
+            "After $([math]::Round(((Get-Date) - $t).TotalSeconds)) s: the log says ready: $seen; its processes running: $($procs.Count) ($(($procs | ForEach-Object { "$($_.ProcessName) '$($_.MainWindowTitle)'" }) -join '; '))"
+            $wv = @(Get-Process msedgewebview2 -ErrorAction SilentlyContinue)
+            "Web view processes: $($wv.Count)"
+            $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+            $bmp.Save((Join-Path $env:RUNNER_TEMP "screen-${{ matrix.app }}-$round.png")); $g.Dispose(); $bmp.Dispose()
+            foreach ($p in $procs) { try { $null = $p.CloseMainWindow() } catch {} }
+            Start-Sleep -Seconds 10
+            Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+          }
+          foreach ($l in $logs) { if (Test-Path $l) { "--- $l"; ReadText $l } else { "--- $l (not written)" } }
+
+      - name: What Windows and Defender recorded
+        if: always()
+        run: |
+          $t0 = [datetime]::Parse($env:T0)
+          "--- Defender's findings since the check began"
+          Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -ge $t0.AddMinutes(-1) } | Format-List ThreatID, ActionSuccess, InitialDetectionTime, Resources, ProcessName, DetectionSourceTypeID | Out-String -Width 300
+          Get-MpThreat -ErrorAction SilentlyContinue | Format-List ThreatName, SeverityID, IsActive, Resources | Out-String -Width 300
+          Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-Windows Defender/Operational'; StartTime = $t0 } -ErrorAction SilentlyContinue | Where-Object { $_.Id -in 1006, 1007, 1008, 1015, 1116, 1117, 1118, 1119, 5007 } | Select-Object -First 30 | ForEach-Object { "[$($_.TimeCreated)] $($_.Id): $($_.Message -replace '\s+', ' ')" }
+          "--- Windows' error records (Application) since the check began"
+          Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $t0; Level = 1, 2 } -ErrorAction SilentlyContinue | Select-Object -First 30 | ForEach-Object { "[$($_.TimeCreated)] $($_.ProviderName) $($_.Id): $(($_.Message -replace '\s+', ' ').Substring(0, [math]::Min(900, ($_.Message -replace '\s+', ' ').Length)))" }
+          "--- Program folder now"
+          if ($env:EXE) { "Program: $env:EXE exists $(Test-Path $env:EXE)" }
+          Get-ChildItem $env:DIR -ErrorAction SilentlyContinue | Select-Object -First 30 | ForEach-Object { "  $($_.Name)  $($_.Length)" }
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens-${{ matrix.app }}
+          path: ${{ runner.temp }}/screen-*.png
+          if-no-files-found: warn
