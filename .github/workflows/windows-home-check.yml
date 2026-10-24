@@ -37,6 +37,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 45
     steps:
+      - uses: actions/checkout@v5
       - name: Defender as at home (real-time and cloud protection on, no exclusions)
         run: |
           $p = Get-MpPreference
@@ -100,7 +101,6 @@ jobs:
           "--- the installer's log (last lines)"; Get-Content $log -Tail 25
 
       - name: Open it from its Start menu entry, twice, and read what it wrote
-        if: matrix.app == 'forge'
         run: |
           function ReadText([string]$path) { try { $fs = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite'); try { (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() } } catch { '' } }
           if ('${{ matrix.app }}' -eq 'ingenium') { $logs = @((Join-Path $env:DIR 'ingenium_crash.log'), (Join-Path $env:DIR 'ingenium_diag.txt'), (Join-Path $env:USERPROFILE 'ingenium_crash.log')); $name = 'Ingenium'; $ready = 'load: verified, page booted|load: page answered but NOT verified|load: probe could not reach' }
