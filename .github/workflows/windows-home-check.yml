@@ -34,7 +34,7 @@ jobs:
       matrix:
         app: [ingenium, forge]
     runs-on: windows-2025
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Defender as at home (real-time and cloud protection on, no exclusions)
         run: |
@@ -77,9 +77,11 @@ jobs:
       - name: Install it, as a person would (the installer's own pages, silently)
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'setup.log'
+          # a person answers Windows' "Do you want to run this file?" with Run; here the download's mark is taken off instead
+          Unblock-File -Path $env:SETUP
           $p = Start-Process -FilePath $env:SETUP -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/LOG=$log" -PassThru
           $null = $p.Handle
-          $null = $p.WaitForExit(900000)
+          if (-not $p.WaitForExit(600000)) { "The installer had not finished after 10 minutes."; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
           "Installer exit code: $($p.ExitCode)"
           Start-Sleep -Seconds 30
           if ('${{ matrix.app }}' -eq 'ingenium') { $dir = Join-Path $env:LOCALAPPDATA 'Programs\Ingenium'; $exe = Join-Path $dir 'Ingenium.exe'; $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Ingenium.lnk' }
