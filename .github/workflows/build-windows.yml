@@ -188,6 +188,13 @@ jobs:
           foreach ($f in @('launch.pyw', 'ingenium_app.py', "$env:APP_FILE.bat", 'install.json', '__pycache__\ingenium_app.pyc', 'engine\windows-x64\old-part.dll')) { 'old' | Set-Content (Join-Path $inst $f) }
           $ws = New-Object -ComObject WScript.Shell
           foreach ($l in @($desk, $menu)) { $sc = $ws.CreateShortcut($l); $sc.TargetPath = (Join-Path $env:pythonLocation 'pythonw.exe'); $sc.Arguments = '"' + (Join-Path $inst 'launch.pyw') + '"'; $sc.Save() }
+          # 6.4: a pin on the taskbar made for the Python version, and a Desktop shortcut to the portable exe unpacked in
+          # Downloads and since deleted ("the file has moved"); and a shortcut to another program that is gone, which must stay
+          $pins = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
+          New-Item -ItemType Directory -Force -Path $pins | Out-Null
+          $pin = Join-Path $pins "$env:APP_NAME.lnk"; $sc = $ws.CreateShortcut($pin); $sc.TargetPath = (Join-Path $env:pythonLocation 'pythonw.exe'); $sc.Arguments = '"' + (Join-Path $inst 'launch.pyw') + '"'; $sc.Save()
+          $port = Join-Path ([Environment]::GetFolderPath('Desktop')) "$env:APP_NAME (portable).lnk"; $sc = $ws.CreateShortcut($port); $sc.TargetPath = (Join-Path $env:USERPROFILE "Downloads\$env:APP_FILE\$env:APP_FILE.exe"); $sc.Save()
+          $other = Join-Path $pins 'Something else.lnk'; $sc = $ws.CreateShortcut($other); $sc.TargetPath = 'C:\Nowhere\something-else.exe'; $sc.Save()
           # 2. the user's own things, which must survive everything below
           $mine = @((Join-Path $env:LOCALAPPDATA "$env:APP_FILE\storage\keep-me.txt"), (Join-Path $env:APPDATA "$env:APP_FILE\models\keep-me.txt"))
           foreach ($m in $mine) { New-Item -ItemType Directory -Force (Split-Path $m) | Out-Null; 'mine' | Set-Content $m }
@@ -220,6 +227,12 @@ jobs:
           if ($ip.ExitCode -ne 0 -or -not (Test-Path $exe)) { Get-Content $log -Tail 40; Write-Output "::error::the installer did not install the app"; exit 1 }
           if (-not ($oldGone -and $listed -and $models -and $engine -and $kept)) { Get-Content $log -Tail 40; Write-Output "::error::the install is not complete"; exit 1 }
           if ($tDesk -ne $exe -or $tMenu -ne $exe) { Write-Output "::error::the shortcuts do not open the installed app"; exit 1 }
+          $tPin = $ws.CreateShortcut($pin); $tPort = $ws.CreateShortcut($port).TargetPath; $tOther = $ws.CreateShortcut($other).TargetPath
+          Note "* Old shortcuts now open: the taskbar pin $($tPin.TargetPath) $($tPin.Arguments); the portable one $tPort; another program's still $tOther"
+          if ($tPin.TargetPath -ne $exe -or $tPin.Arguments -ne '' -or $tPort -ne $exe) { Get-Content $log -Tail 40; Write-Output "::error::the installer did not repair the shortcuts an earlier version left"; exit 1 }
+          if ($tOther -ne 'C:\Nowhere\something-else.exe') { Write-Output "::error::the installer changed a shortcut that was not the app's"; exit 1 }
+          if ((Get-Content $log -Raw) -notmatch 'still in place three seconds after') { Get-Content $log -Tail 40; Write-Output "::error::the installer did not find its program in place three seconds later"; exit 1 }
+          Remove-Item $pin, $port, $other -ErrorAction SilentlyContinue
           # 4. the installed app's own test: its engine answers with a built-in model, its thinking model thinks,
           #    Velox's speed-up file is tried (for the record only), and it lends its models over the network
           $res = Join-Path $env:RUNNER_TEMP 'selftest.json'
@@ -243,6 +256,58 @@ jobs:
           if ($r.error) { Note ("* Error: " + $r.error) }
           Get-Content $res
           if ($p.ExitCode -ne 0 -or -not $r.ok) { Write-Output "::error::the installed app's engine did not answer correctly"; exit 1 }
+
+      # 6.4: the owner's words (24 October 2026), "Ingenium keeps on crashing before opening on my windows laptop". The
+      # self-test above never opens the window; this opens the installed app as a person does and waits for its page to
+      # say it has started, then clicks again (one copy at a time), closes it as its close button does (a clean ending),
+      # and opens it after a run that did not finish (safe graphics, remembered for the PC).
+      - name: Open the installed app as a person does (its window, a second click, safe graphics)
+        shell: pwsh
+        run: |
+          function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
+          function ReadText([string]$path) { try { $fs = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite'); try { (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() } } catch { '' } }
+          $inst = Join-Path $env:LOCALAPPDATA "Programs\$env:APP_FILE"
+          $exe = Join-Path $inst "$env:APP_FILE.exe"
+          $log = Join-Path $inst 'ingenium_crash.log'
+          $flag = Join-Path $env:USERPROFILE "Library\Application Support\$env:APP_FILE\ingenium_session.flag"
+          $note = Join-Path $env:LOCALAPPDATA "$env:APP_FILE\$($env:APP_FILE.ToLower())_safe_graphics.txt"
+          Remove-Item $note, $flag -ErrorAction SilentlyContinue
+          $up = 'load: verified, page booted|load: page answered but NOT verified|load: probe could not reach'
+          function Count([string]$pat) { [regex]::Matches((ReadText $log), $pat).Count }
+          function OpenIt {
+            $seen = Count $up
+            $p = Start-Process -FilePath $exe -WorkingDirectory $inst -PassThru
+            $null = $p.Handle
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while (($clock.Elapsed.TotalSeconds -lt 180) -and -not $p.HasExited -and ((Count $up) -le $seen)) { Start-Sleep -Milliseconds 500 }
+            return @($p, [math]::Round($clock.Elapsed.TotalSeconds, 1), ((Count 'load: verified, page booted') -gt 0))
+          }
+          function CloseIt($p) { $p.Refresh(); $null = $p.CloseMainWindow(); if (-not $p.WaitForExit(40000)) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; return $false }; return $true }
+          function Fail([string]$why) { "--- the app's log"; ReadText $log | Select-Object -Last 80; Write-Output "::error::$why"; exit 1 }
+          Note "### The installed app, opened as a person does"
+          $a, $t, $ok = OpenIt
+          if ($a.HasExited) { Fail "the app ended by itself before its page started (exit code $($a.ExitCode))" }
+          if (-not $ok) { Fail "the app's page did not say it had started within 180 s" }
+          Note "* Its page started after $t s; graphics: $(if ((ReadText $log) -match 'graphics: full') { 'full' } else { 'NOT full' })"
+          $b = Start-Process -FilePath $exe -WorkingDirectory $inst -PassThru
+          $null = $b.Handle
+          $twice = $b.WaitForExit(45000)
+          $fwd = (ReadText $log) -match 'start: already open'
+          Note "* A second click: that copy ended by itself: $twice; it brought the open window forward: $fwd; the first is still open: $(-not $a.HasExited)"
+          if (-not $twice -or -not $fwd -or $a.HasExited) { Fail "a second click did not leave one copy open" }
+          $closed = CloseIt $a
+          Start-Sleep -Seconds 2
+          Note "* Closed as its close button does: $closed; a clean ending (no session mark left): $(-not (Test-Path $flag))"
+          if (-not $closed -or (Test-Path $flag)) { Fail "the app did not close cleanly" }
+          New-Item -ItemType Directory -Force -Path (Split-Path $flag) | Out-Null
+          Set-Content -Path $flag -Value '1'
+          $c, $t, $ok = OpenIt
+          if ($c.HasExited -or -not $ok) { Fail "after a run that did not finish, the app did not start" }
+          $safe = (ReadText $log) -match 'graphics: safe graphics switched on for this PC by themselves'
+          Note "* After a run that did not finish: started after $t s, safe graphics switched on: $safe, remembered: $(Test-Path $note)"
+          $null = CloseIt $c
+          if (-not $safe -or -not (Test-Path $note)) { Fail "safe graphics were not switched on after a run that did not finish" }
+          Remove-Item $note -ErrorAction SilentlyContinue
 
       - name: How long each app takes to start (installed app against the portable exe)
         shell: pwsh

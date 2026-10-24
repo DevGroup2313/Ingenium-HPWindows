@@ -18,6 +18,7 @@ on:
   push:
     paths:
       - '.github/workflows/windows-home-check.yml'
+      - '.github/diag/**'
   workflow_dispatch:
 
 permissions:
@@ -129,6 +130,24 @@ jobs:
             Start-Sleep -Seconds 3
           }
           foreach ($l in $logs) { if (Test-Path $l) { "--- $l"; ReadText $l } else { "--- $l (not written)" } }
+
+      - name: Inside Ingenium's window, asked of its web view (remote debugging, a check only)
+        if: matrix.app == 'ingenium'
+        run: |
+          python -m pip install --quiet --disable-pip-version-check websocket-client pillow
+          Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9333'
+          $p = Start-Process -FilePath $env:EXE -WorkingDirectory $env:DIR -PassThru
+          foreach ($wait in 20, 40, 60) {
+            Start-Sleep -Seconds 20
+            "=== after $wait s (the app still running: $(-not $p.HasExited))"
+            python .github/diag/cdp_probe.py 9333 (Join-Path $env:RUNNER_TEMP "screen-ingenium-cdp-$wait.png")
+          }
+          "=== the page as the window is given it (the quick page), asked directly"
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:17953/ingenium.html' -Headers @{ 'Sec-Fetch-Dest' = 'document' } -TimeoutSec 60 -UseBasicParsing; "status $($r.StatusCode), $($r.RawContentLength) bytes, $([math]::Round($sw.Elapsed.TotalSeconds,1)) s" } catch { "failed: $($_.Exception.Message)" }
+          "--- the app's log"; Get-Content (Join-Path $env:DIR 'ingenium_crash.log') -Tail 40
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
 
       - name: What Windows and Defender recorded
         if: always()
