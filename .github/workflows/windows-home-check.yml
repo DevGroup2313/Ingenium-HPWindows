@@ -100,6 +100,7 @@ jobs:
           "--- the installer's log (last lines)"; Get-Content $log -Tail 25
 
       - name: Open it from its Start menu entry, twice, and read what it wrote
+        if: matrix.app == 'forge'
         run: |
           function ReadText([string]$path) { try { $fs = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite'); try { (New-Object IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() } } catch { '' } }
           if ('${{ matrix.app }}' -eq 'ingenium') { $logs = @((Join-Path $env:DIR 'ingenium_crash.log'), (Join-Path $env:DIR 'ingenium_diag.txt'), (Join-Path $env:USERPROFILE 'ingenium_crash.log')); $name = 'Ingenium'; $ready = 'load: verified, page booted|load: page answered but NOT verified|load: probe could not reach' }
@@ -137,11 +138,14 @@ jobs:
           python -m pip install --quiet --disable-pip-version-check websocket-client pillow
           Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9333'
+          "Defender busy at the first start: $((Get-Process MsMpEng -ErrorAction SilentlyContinue | ForEach-Object { [math]::Round($_.CPU) }) -join ',') s of processor so far"
           $p = Start-Process -FilePath $env:EXE -WorkingDirectory $env:DIR -PassThru
-          foreach ($wait in 20, 40, 60) {
-            Start-Sleep -Seconds 20
-            "=== after $wait s (the app still running: $(-not $p.HasExited))"
+          foreach ($wait in 15, 30, 60, 120) {
+            Start-Sleep -Seconds ($wait - $(if ($wait -eq 15) { 0 } elseif ($wait -eq 30) { 15 } elseif ($wait -eq 60) { 30 } else { 60 }))
+            $cpu = (Get-Process -Id $p.Id -ErrorAction SilentlyContinue).CPU
+            "=== first start, after $wait s (the app still running: $(-not $p.HasExited); its processor time $([math]::Round($cpu,1)) s; Defender's $((Get-Process MsMpEng -ErrorAction SilentlyContinue | ForEach-Object { [math]::Round($_.CPU) }) -join ',') s)"
             python .github/diag/cdp_probe.py 9333 (Join-Path $env:RUNNER_TEMP "screen-ingenium-cdp-$wait.png")
+            "--- the app's log so far"; Get-Content (Join-Path $env:DIR 'ingenium_crash.log') -Tail 6
           }
           "=== the page as the window is given it (the quick page), asked directly"
           $sw = [Diagnostics.Stopwatch]::StartNew()
