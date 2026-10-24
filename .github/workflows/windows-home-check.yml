@@ -85,9 +85,12 @@ jobs:
           if ('${{ matrix.app }}' -eq 'ingenium') { $dir = Join-Path $env:LOCALAPPDATA 'Programs\Ingenium'; $exe = Join-Path $dir 'Ingenium.exe'; $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'Ingenium.lnk' }
           else { $dir = Join-Path $env:LOCALAPPDATA 'Programs\The Forge'; $exe = Join-Path $dir 'The Forge.exe'; $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'The Forge.lnk' }
           $ws = New-Object -ComObject WScript.Shell
-          $target = if (Test-Path $lnk) { $ws.CreateShortcut($lnk).TargetPath } else { '(no Start menu entry)' }
-          "Program: $exe exists $(Test-Path $exe)"
-          "Start menu entry: $lnk -> $target; the target exists: $(if ($target -and $target -notlike '(*') { Test-Path $target } else { $false })"
+          $target = ''
+          if (Test-Path $lnk) { $target = $ws.CreateShortcut($lnk).TargetPath }
+          $there = [bool]($target -and (Test-Path $target))
+          $exeThere = Test-Path $exe
+          "Program: $exe exists $exeThere"
+          "Start menu entry: $lnk exists $(Test-Path $lnk), opens $target; that file exists: $there"
           $files = Get-ChildItem $dir -Recurse -File -ErrorAction SilentlyContinue
           "Program folder: $($files.Count) files, $([math]::Round((($files | Measure-Object Length -Sum).Sum) / 1MB, 1)) MB"
           @("DIR=$dir", "EXE=$exe", "LNK=$lnk") | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
