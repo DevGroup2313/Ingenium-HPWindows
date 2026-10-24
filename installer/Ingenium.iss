@@ -151,3 +151,119 @@ begin
   if CurUninstallStep = usUninstall then
     StopProgramsUnder(ExpandConstant('{app}'));
 end;
+
+{ 6.4: shortcuts left by an earlier way of having the app (24 October 2026). A Desktop shortcut or a pin on the taskbar or in
+  Start made for the portable {#AppFile}.exe unpacked from a zip and since deleted ("the file has moved"), or for the old
+  Python version (pythonw.exe opening launch.pyw, which this installer removes), now opens the installed program. Only such
+  a shortcut is changed, and every change is written in the installer's log. }
+function IsOldAppShortcut(const LinkName, Old, Args: String): Boolean;
+var
+  N: String;
+begin
+  N := Lowercase(ExtractFileName(Old));
+  if N = Lowercase('{#AppFile}.exe') then
+    Result := not FileExists(Old)
+  else if (N = 'pythonw.exe') or (N = 'python.exe') or (N = 'pyw.exe') or (N = 'py.exe') then
+    Result := (Pos(Lowercase('{#AppFile}'), Lowercase(LinkName)) = 1) and
+      ((Pos('launch.pyw', Lowercase(Args)) > 0) or (Pos('ingenium_app.py', Lowercase(Args)) > 0))
+  else
+    Result := False;
+end;
+
+procedure RepairShortcutsIn(Shell: Variant; const Dir, Target: String; Depth: Integer);
+var
+  FindRec: TFindRec;
+  Path, Old, Args: String;
+  Lnk: Variant;
+begin
+  if (Dir = '') or not DirExists(Dir) then
+    exit;
+  if FindFirst(AddBackslash(Dir) + '*', FindRec) then
+  begin
+    try
+      repeat
+        Path := AddBackslash(Dir) + FindRec.Name;
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        begin
+          if (Depth > 0) and (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+            RepairShortcutsIn(Shell, Path, Target, Depth - 1);
+        end
+        else if CompareText(ExtractFileExt(FindRec.Name), '.lnk') = 0 then
+        begin
+          try
+            Lnk := Shell.CreateShortcut(Path);
+            Old := Lnk.TargetPath;
+            Args := Lnk.Arguments;
+            if (Old <> '') and (CompareText(Old, Target) <> 0) and IsOldAppShortcut(FindRec.Name, Old, Args) then
+            begin
+              Lnk.TargetPath := Target;
+              Lnk.Arguments := '';
+              Lnk.WorkingDirectory := ExtractFileDir(Target);
+              Lnk.IconLocation := Target + ',0';
+              Lnk.Save;
+              Log('Shortcut repaired: ' + Path + ' opened ' + Old + ' ' + Args + '; it now opens ' + Target);
+            end;
+          except
+            Log('A shortcut could not be read or repaired: ' + Path + ' (' + GetExceptionMessage + ')');
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+{ 6.4: the program, a moment after it was put in place. Something on the PC that removes a new program at once (an
+  antivirus that takes a new, unsigned program for a threat) makes the app seem to crash before it opens, or its
+  shortcuts say that the file has moved. The installer looks again three seconds later and, if the program or one of
+  its parts is gone, says so plainly, with what to do. }
+procedure CheckProgramStayed;
+var
+  I: Integer;
+  Gone: String;
+begin
+  I := 0;
+  while FileExists(ExpandConstant('{app}\{#AppFile}.exe')) and (I < 6) do
+  begin
+    Sleep(500);
+    I := I + 1;
+  end;
+  Gone := '';
+  if not FileExists(ExpandConstant('{app}\{#AppFile}.exe')) then
+    Gone := '{#AppFile}.exe'
+  else if not FileExists(ExpandConstant('{app}\_internal\python312.dll')) then
+    Gone := 'a part of it (_internal\python312.dll)'
+  else if not FileExists(ExpandConstant('{app}\engine\windows-x64\llama-server.exe')) then
+    Gone := 'its engine (engine\windows-x64\llama-server.exe)';
+  if Gone = '' then
+    Log('The program is still in place three seconds after it was installed.')
+  else
+  begin
+    Log('Removed by something on this PC a moment after it was installed: ' + Gone);
+    if not WizardSilent then
+      MsgBox('{#AppName} was installed, but a moment later something on this PC removed ' + Gone + '.' + #13#10#13#10 +
+        'This is almost always an antivirus taking a new program for a threat. In Windows Security, open Virus & threat protection, then Protection history. ' +
+        'If it is listed there, choose Actions, then Restore (or Allow on device). Another antivirus has a list like it, often called Quarantine.' + #13#10#13#10 +
+        'Then run this installer again.', mbInformation, MB_OK);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Shell: Variant;
+  Target: String;
+begin
+  if CurStep <> ssPostInstall then
+    exit;
+  Target := ExpandConstant('{app}\{#AppFile}.exe');
+  try
+    Shell := CreateOleObject('WScript.Shell');
+    RepairShortcutsIn(Shell, ExpandConstant('{userdesktop}'), Target, 0);
+    RepairShortcutsIn(Shell, ExpandConstant('{userstartmenu}'), Target, 2);
+    RepairShortcutsIn(Shell, ExpandConstant('{userappdata}\Microsoft\Internet Explorer\Quick Launch'), Target, 2);
+  except
+    Log('Old shortcuts were not looked at: ' + GetExceptionMessage);
+  end;
+  CheckProgramStayed;
+end;

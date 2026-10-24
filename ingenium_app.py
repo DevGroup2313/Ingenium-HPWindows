@@ -1297,7 +1297,7 @@ class _LiteWindows:
         return json.dumps(q)
 
     def main_focus(self):
-        _lite_forward(getattr(self, "main_window", None))
+        _lite_forward(getattr(self, "_main_window", None))
         return True
 
     def lite_taken(self, tok):
@@ -1453,7 +1453,7 @@ class IngeniumApi(_LiteWindows):
     def __init__(self, app_url):
         import threading
         self._app_url = app_url
-        self.main_window = None
+        self._main_window = None
         self._wins = {}
         # Creating two native windows at once is a real way to destabilise the
         # platform web view. One creation at a time, and never a duplicate.
@@ -1537,7 +1537,7 @@ class IngeniumApi(_LiteWindows):
     # R64: model files chosen with this computer's own dialog are linked where
     # they are, as Ollama's are (see _pick_model_files below).
     def pick_model_files(self):
-        return _pick_model_files(self.main_window)
+        return _pick_model_files(self._main_window)
 
     # R65: the native engine, and the page file for the build kits
     def engine_info(self):
@@ -1716,7 +1716,7 @@ class IngeniumApiSingle(_LiteWindows):
 
     def __init__(self, app_url):
         self._app_url = app_url
-        self.main_window = None
+        self._main_window = None
 
     def save_file(self, name, mime, data_b64):
         return save_bytes(None, name, mime, data_b64)
@@ -1779,7 +1779,7 @@ class IngeniumApiSingle(_LiteWindows):
         return _ollama_library()
 
     def pick_model_files(self):
-        return _pick_model_files(self.main_window)
+        return _pick_model_files(self._main_window)
 
     # R65: the native engine, and the page file for the build kits
     def engine_info(self):
@@ -5113,6 +5113,8 @@ def _make_window(webview, api, app_url, app_html_path):
         # R98: the address carries this build's mark, so a web view that kept an
         # earlier page (before the page was sent as never to be kept) cannot use it
         local_url = "http://127.0.0.1:%d/%s?b=%s" % (port, name, _page_mark(app_html_path))
+        if _GFX_SOFT[0]:
+            local_url += "&softgpu=1"
         log_problem("serving the page at %s (real origin)" % local_url)
         return webview.create_window(WINDOW_TITLE, url=local_url, **common)
     except Exception:
@@ -5446,8 +5448,172 @@ def _seal_shortcuts(bundle, img):
             pass
 
 
+# 6.4 (app_win_64.py): on Windows, one copy at a time, and safe graphics after a start that did not finish, as the Forge does
+SINGLE_INSTANCE_NAME = "Local\\" + APP_FOLDER + ".windows.single"
+_single_instance = []
+SAFE_GRAPHICS_ARGS = "--disable-gpu-compositing --disable-features=CalculateNativeWinOcclusion"
+_GFX_SOFT = [False]
+
+
+def _bring_window_forward(wait_s=30.0):
+    """Find the open copy's window by its title (only pywebview's own window class, or one of its message boxes, counts)
+    and bring it forward: restored when minimised, shown as it is otherwise. The first copy may still be making its window,
+    so this looks again for up to wait_s seconds."""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.FindWindowExW.argtypes = (wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR)
+    user32.FindWindowExW.restype = wintypes.HWND
+    user32.GetClassNameW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
+    user32.GetClassNameW.restype = ctypes.c_int
+    user32.IsIconic.argtypes = (wintypes.HWND,)
+    user32.IsIconic.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
+    user32.ShowWindow.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = (wintypes.HWND,)
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+
+    def find():
+        after = None
+        for _ in range(64):
+            hwnd = user32.FindWindowExW(None, after, None, WINDOW_TITLE)
+            if not hwnd:
+                return None
+            name = ctypes.create_unicode_buffer(256)
+            user32.GetClassNameW(hwnd, name, 256)
+            if name.value.startswith("WindowsForms") or name.value == "#32770":
+                return hwnd
+            after = hwnd
+        return None
+
+    end = time.monotonic() + wait_s
+    hwnd = find()
+    while not hwnd and time.monotonic() < end:
+        time.sleep(0.25)
+        hwnd = find()
+    if not hwnd:
+        return False
+    user32.ShowWindow(hwnd, 9 if user32.IsIconic(hwnd) else 5)
+    user32.SetForegroundWindow(hwnd)
+    return True
+
+
+def _another_copy_is_open():
+    """True when this app is already open in this sign-in: its window is brought forward and this copy ends at once,
+    before the session mark is read or written. A named mutex; the first copy keeps its handle for its whole life, and
+    Windows lets go of it when the process ends, so a crash never leaves the name behind. Windows only; anything that goes
+    wrong here opens the app as usual."""
+    if not sys.platform.startswith("win"):
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        handle = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_NAME)
+        err = ctypes.get_last_error()
+        if not handle:
+            log_problem("single copy: no guard on this PC (error %d); opening as usual" % err)
+            return False
+        if err != 183:   # ERROR_ALREADY_EXISTS
+            _single_instance.append(handle)
+            return False
+        try:
+            kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+            kernel32.CloseHandle(handle)
+        except Exception:
+            pass
+    except Exception as exc:
+        log_problem("single copy: no guard on this PC (%s); opening as usual" % (exc,))
+        return False
+    try:
+        if _bring_window_forward():
+            log_problem("start: already open; brought its window forward")
+        else:
+            log_problem("start: already open, but its window has not appeared yet")
+            tell_user("%s is still opening.\n\nIts window will appear in a moment." % APP_NAME)
+    except Exception as exc:
+        log_problem("start: already open; its window could not be brought forward (%s)" % (exc,))
+    return True
+
+
+def _safe_graphics_file():
+    """The note that keeps safe graphics on for this PC: beside the stored work (not inside it, which a fresh start moves
+    aside), so an update or a new install keeps it."""
+    d = storage_dir()
+    d = os.path.dirname(d.rstrip("\\/")) if d else os.path.expanduser("~")
+    return os.path.join(d, APP_FOLDER.lower() + "_safe_graphics.txt")
+
+
+def _graphics_chips():
+    """The names of this PC's graphics chips, as Windows lists them (the display adapters' class key), or [] when they
+    cannot be read."""
+    names = []
+    try:
+        import winreg
+        base = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as root:
+            for i in range(32):
+                try:
+                    sub = winreg.EnumKey(root, i)
+                except OSError:
+                    break
+                if not sub.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(root, sub) as k:
+                        names.append(str(winreg.QueryValueEx(k, "DriverDesc")[0]))
+                except OSError:
+                    continue
+    except Exception:
+        pass
+    return names
+
+
+def _prepare_windows_graphics(prior_bad):
+    """Choose the arguments Edge WebView2 starts with, on Windows only; True when safe graphics are used. Full graphics on a
+    PC that has never had a run end badly; safe graphics from the first start that finds an unfinished run, remembered in
+    the note so every later start uses them; on AMD Radeon graphics, safe from the first start. Every start writes one line
+    saying which it used. Must run before the web view is made: that is when the arguments are read."""
+    if not sys.platform.startswith("win"):
+        return False
+    existing = os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "").strip()
+    path = _safe_graphics_file()
+    remembered = os.path.isfile(path)
+    chips = _graphics_chips()
+    amd = [c for c in chips if re.search(r"radeon|\bamd\b|\bati\b", c, re.I)]
+    if not remembered and prior_bad < 1 and not amd:
+        if "--disable-gpu-compositing" in existing:
+            log_problem("graphics: safe, set from outside the app (%s)" % existing)
+            return True
+        log_problem("graphics: full (the graphics chip helps draw the window; %s)" % (", ".join(chips) or "chip not named"))
+        return False
+    if remembered:
+        why = "safe graphics are on for this PC, after a run that did not finish. To try full graphics again, close %s and delete %s" % (APP_NAME, path)
+    else:
+        why = (("AMD Radeon graphics (%s): safe graphics from the first start" % ", ".join(amd)) if amd and prior_bad < 1
+               else "safe graphics switched on for this PC by themselves, because the last run did not finish")
+        try:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("Safe graphics are on for %s on this PC.\n\n"
+                         "%s switched them on by itself on %s: %s.\n"
+                         "With safe graphics the window is drawn without the graphics chip's help, a little less smooth and safe.\n\n"
+                         "To try full graphics again: close %s, delete this file, and open %s.\n"
+                         "If its window ever closes by itself again, safe graphics switch back on by themselves.\n"
+                         % (APP_NAME, APP_NAME, time.strftime("%d %B %Y at %H:%M"), why, APP_NAME, APP_NAME))
+        except Exception as exc:
+            log_problem("graphics: safe graphics could not be remembered on this PC (%s)" % (exc,))
+    args = (existing + " " + SAFE_GRAPHICS_ARGS).strip() if "--disable-gpu-compositing" not in existing else existing
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = args
+    log_problem("graphics: %s (%s)" % (why, args))
+    return True
+
+
 def main():
     global _APP_HTML_PATH
+    if _another_copy_is_open():
+        return
     app_html = find_app_html()
     _APP_HTML_PATH = app_html
     try:
@@ -5512,6 +5678,10 @@ def main():
 
     _prior_bad = _begin_session()
     _lite_start(_prior_bad)
+    try:
+        _GFX_SOFT[0] = _prepare_windows_graphics(_prior_bad)
+    except Exception:
+        log_problem("graphics: could not be chosen; full graphics", sys.exc_info())
     if _prior_bad >= 2:
         # Two runs in a row ended badly. The stored session is the usual
         # suspect: a poisoned save used to survive every reinstall (it lives in
@@ -5553,7 +5723,7 @@ def main():
             "Details were written to:\n  %s" % (APP_NAME, crash_log_path()))
         sys.exit(1)
     try:
-        api.main_window = window
+        api._main_window = window
     except Exception:
         pass
     _window_keep(window, _WINDOW_ASKED or None)
