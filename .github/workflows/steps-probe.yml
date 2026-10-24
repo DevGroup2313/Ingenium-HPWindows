@@ -1,0 +1,53 @@
+# INGENIUM  |  Copyright (c) 2026 Yannie D. Forest. All rights reserved.
+# NO LICENCE IS GRANTED. See LICENCE.txt.
+#
+# 24 October 2026: what the app's own engine and the models Ingenium offers send back when Break it down is
+# pressed (tools/steps_probe.py). It publishes nothing.
+name: Break it down, asked of the real models
+
+on:
+  push:
+    paths:
+      - '.github/workflows/steps-probe.yml'
+      - 'tools/steps_probe.py'
+      - 'tools/steps_probe_system.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  steps:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: The engine (llama.cpp's Windows build, checked)
+        run: |
+          python tools/get_engine_windows.py engine/windows-x64.zip
+          mkdir -p "$RUNNER_TEMP/engine" && 7z x -y -o"$RUNNER_TEMP/engine" engine/windows-x64.zip > /dev/null
+          ls "$RUNNER_TEMP/engine" | head -40
+      - name: The models from the lineup (Velox, Scriba, the Fire tablet's Scriba)
+        run: |
+          mkdir -p "$RUNNER_TEMP/m"
+          get() { curl -sSL --retry 4 -o "$RUNNER_TEMP/m/$1" "$2"; ls -la "$RUNNER_TEMP/m/$1"; }
+          get LFM2.5-1.2B-Instruct-Q4_K_M.gguf https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf
+          get Qwen3.5-2B-Q4_K_M.gguf https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf
+          get LFM2.5-1.2B-Thinking-Q4_K_M.gguf https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q4_K_M.gguf
+      - name: Break it down as 6.3 asks (an answer of at most 420 tokens)
+        env:
+          PYTHONIOENCODING: utf-8
+          STEPS_MAX: '420'
+        run: python tools/steps_probe.py "$RUNNER_TEMP/engine" "$RUNNER_TEMP"/m/*.gguf | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: The same with room for 1200 tokens
+        env:
+          PYTHONIOENCODING: utf-8
+          STEPS_MAX: '1200'
+        run: python tools/steps_probe.py "$RUNNER_TEMP/engine" "$RUNNER_TEMP"/m/*.gguf | tee -a "$GITHUB_STEP_SUMMARY"
