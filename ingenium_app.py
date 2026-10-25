@@ -5377,7 +5377,8 @@ def _begin_session():
 
 
 def _end_session():
-    """A clean exit removes the breadcrumb, so only bad endings accumulate."""
+    """A clean exit removes the breadcrumb, so only bad endings accumulate (6.7.1: and the start's own mark)."""
+    _start_ok()
     f = _session_flag()
     try:
         if f is not None and f.exists():
@@ -5385,6 +5386,176 @@ def _end_session():
     except Exception:
         pass
     _lite_mark(False)
+
+
+# 6.7.1 (app_care_671.py): the stored work is kept, and a page whose process stops comes back by itself
+_CARE = {"attached": False, "reloads": [], "told": False, "gpu": 0, "refs": []}
+
+
+def _start_flag():
+    f = _session_flag()
+    return None if f is None else f.with_name("ingenium_start.flag")
+
+
+def _begin_start():
+    """How many starts in a row ended before the page came up. This start is counted too, until the page comes up."""
+    f = _start_flag()
+    if f is None:
+        return 0
+    n = 0
+    try:
+        if f.exists():
+            n = int(f.read_text().strip() or "1")
+    except Exception:
+        n = 1
+    try:
+        f.write_text(str(n + 1))
+    except Exception:
+        pass
+    return n
+
+
+def _start_ok():
+    """The page came up (or this run ended cleanly, or it cannot be judged): this start does not count."""
+    f = _start_flag()
+    try:
+        if f is not None and f.exists():
+            f.unlink()
+    except Exception:
+        pass
+
+
+def _move_store_aside(n):
+    """The page did not come up at n starts in a row: the stored work is moved aside, whole, under a name of its own, and
+    the person is told. Nothing kept is deleted, and it is not done again within the hour."""
+    try:
+        store = storage_dir()
+        if not (store and os.path.isdir(store)):
+            return
+        import glob
+        base = store.rstrip("\\/")
+        def made(k):  # when it was moved aside: the date and time in its name (a folder's own time is its last change)
+            try:
+                return time.mktime(time.strptime(k[len(base) + 6:len(base) + 23], "%Y-%m-%d-%H%M%S"))
+            except Exception:
+                return os.path.getmtime(k)
+        recent = [k for k in glob.glob(base + ".kept-*") if time.time() - made(k) < 3600]
+        if recent:
+            log_problem("start: the page did not come up at %d starts in a row; the work was already moved aside within "
+                        "the hour (%s), so it is left where it is" % (n, recent[0]))
+            return
+        aside = base + ".kept-" + time.strftime("%Y-%m-%d-%H%M%S")
+        k = 2
+        while os.path.exists(aside):
+            aside = base + ".kept-" + time.strftime("%Y-%m-%d-%H%M%S") + "-%d" % k
+            k += 1
+        os.rename(store, aside)
+        log_problem("start: the page did not come up at %d starts in a row; the stored work was moved aside, whole, to "
+                    "%s (nothing deleted); starting fresh" % (n, aside))
+        msg = ("%s did not come up the last %d times it was opened, so this time it starts with a fresh place for its "
+               "work.\n\nNothing was deleted. Everything it held before is kept, whole, in:\n  %s\n\n"
+               "To bring it back: close %s, rename the folder called storage beside it to storage-new, rename the kept "
+               "folder to storage, and open %s again. A backup file (Settings, Backup) can also be restored."
+               % (APP_NAME, n, aside, APP_NAME, APP_NAME))
+        threading.Thread(target=tell_user, args=(msg,), daemon=True).start()
+    except Exception:
+        log_problem("start: fresh-start move failed", sys.exc_info())
+
+
+def _care_say(text):
+    if not _CARE["told"]:
+        _CARE["told"] = True
+        threading.Thread(target=tell_user, args=(text,), daemon=True).start()
+
+
+def _care_attach(window):
+    """Windows: listen for the web view's processes stopping, and for Windows ending the session. Once, from the first
+    page load (the web view exists by then); the listening itself is set up on the window's own thread."""
+    if _CARE["attached"] or not sys.platform.startswith("win"):
+        return
+    _CARE["attached"] = True
+    try:
+        import clr  # noqa: F401  (pythonnet, already loaded by the window)
+        from System import Func, Type
+        from Microsoft.Web.WebView2.Core import CoreWebView2ProcessFailedKind as K
+        from Microsoft.Win32 import SystemEvents
+        form = getattr(window, "native", None)
+        wv = getattr(form, "webview", None) if form is not None else None
+        if wv is None:
+            log_problem("care: the web view could not be reached; a page whose process stops will not come back by itself")
+            return
+
+        def failed(_sender, args):
+            try:
+                kind = args.ProcessFailedKind
+                more = ""
+                try:
+                    more = " (%s, exit code %s)" % (args.Reason, args.ExitCode)
+                except Exception:
+                    pass
+                now = time.time()
+                if kind == K.RenderProcessExited:
+                    recent = [t for t in _CARE["reloads"] if now - t < 120]
+                    if len(recent) >= 3:
+                        log_problem("page: its process stopped again%s, after three new starts in two minutes; left as it is" % more)
+                        _care_say("%s's page stopped working several times in a row.\n\nYour work is saved as you go. "
+                                  "Please close %s and open it again.\n\nDetails were written to:\n  %s"
+                                  % (APP_NAME, APP_NAME, crash_log_path()))
+                        return
+                    recent.append(now)
+                    _CARE["reloads"] = recent
+                    log_problem("page: its process stopped%s; the page is loaded again" % more)
+                    wv.CoreWebView2.Reload()
+                elif kind == K.RenderProcessUnresponsive:
+                    log_problem("page: its process is not answering%s; left to finish what it is doing" % more)
+                elif kind == K.GpuProcessExited:
+                    _CARE["gpu"] += 1
+                    log_problem("graphics: the graphics process stopped%s (%d this run)" % (more, _CARE["gpu"]))
+                    path = _safe_graphics_file()
+                    if _CARE["gpu"] >= 2 and not _GFX_SOFT[0] and not os.path.isfile(path):
+                        with open(path, "w", encoding="utf-8") as fh:
+                            fh.write("Safe graphics are on for %s on this PC.\n\n%s switched them on by itself on %s: its "
+                                     "graphics process stopped twice in one run.\nWith safe graphics the window is drawn "
+                                     "without the graphics chip's help, a little less smooth and safe.\n\nTo try full "
+                                     "graphics again: close %s, delete this file, and open %s.\n"
+                                     % (APP_NAME, APP_NAME, time.strftime("%d %B %Y at %H:%M"), APP_NAME, APP_NAME))
+                        log_problem("graphics: safe graphics kept for the next start (%s)" % path)
+                elif kind == K.BrowserProcessExited:
+                    log_problem("web view: its own process stopped%s; the window cannot show the page until %s is opened again"
+                                % (more, APP_NAME))
+                    _care_say("%s's window stopped working (its web view closed).\n\nYour work is saved as you go. "
+                              "Please close %s and open it again." % (APP_NAME, APP_NAME))
+                else:
+                    log_problem("web view: a helper process stopped (%s)%s" % (kind, more))
+            except BaseException:
+                log_problem("care: a stopped process could not be handled", sys.exc_info())
+
+        def ended(_sender, args):
+            try:
+                log_problem("session: Windows is ending the session (%s); this run counts as finished" % (args.Reason,))
+                _end_session()
+            except BaseException:
+                pass
+
+        def attach():
+            core = wv.CoreWebView2
+            if core is None:
+                log_problem("care: the web view is not ready; a page whose process stops will not come back by itself")
+                return None
+            core.ProcessFailed += failed
+            SystemEvents.SessionEnded += ended
+            _CARE["refs"] += [failed, ended]
+            ver = ""
+            try:
+                ver = str(core.Environment.BrowserVersionString)
+            except Exception:
+                pass
+            log_problem("care: listening for the page's processes stopping and for Windows ending the session (web view %s)"
+                        % (ver or "version unknown"))
+            return None
+        form.Invoke(Func[Type](attach))
+    except BaseException:
+        log_problem("care: could not listen to the web view", sys.exc_info())
 
 
 _RP_MONITOR = None
@@ -5934,28 +6105,11 @@ def main():
         _GFX_SOFT[0] = _prepare_windows_graphics(_prior_bad)
     except Exception:
         log_problem("graphics: could not be chosen; full graphics", sys.exc_info())
-    if _prior_bad >= 2:
-        # Two runs in a row ended badly. The stored session is the usual
-        # suspect: a poisoned save used to survive every reinstall (it lives in
-        # the profile, never beside the app) and wedge every later start, which
-        # is the "crash permanently" the owner described. The fix is a fresh
-        # start: the stored web data is moved aside, not deleted, so nothing is
-        # lost beyond recall, and the page then boots empty and well. The page
-        # also quarantines a corrupt save on its own and keeps a recovery shelf
-        # of earlier moments, so routine work is carried by gentler means; this
-        # step is only for two hard crashes in a row.
-        try:
-            store = storage_dir()
-            if store and os.path.isdir(store):
-                import shutil
-                aside = (store.rstrip(os.sep) + ".crashed-%d" % _prior_bad)
-                if os.path.exists(aside):
-                    shutil.rmtree(aside)
-                os.rename(store, aside)
-                log_problem("start: %d runs ended badly; stored session moved aside to %s; starting fresh"
-                            % (_prior_bad, aside))
-        except Exception:
-            log_problem("start: fresh-start move failed", sys.exc_info())
+    # 6.7.1 (app_care_671.py): the stored work is moved aside only when the page did not come up at two starts
+    # in a row (a save that stops every start); a run whose page came up does not count, however it ended
+    _prior_unstarted = _begin_start()
+    if _prior_unstarted >= 2:
+        _move_store_aside(_prior_unstarted)
     if not os.environ.get("INGENIUM_NATIVE_WINDOWS"):
         api = IngeniumApiSingle(app_url)
         log_problem("%s: one window, the app draws its own floating windows" % _platform_tag())
@@ -5994,6 +6148,7 @@ def main():
             _boot_state["loaded"] = True
             log_problem("load: page reported loaded")
             _install_right_press_monitor(window)
+            _care_attach(window)  # 6.7.1 (app_care_671.py)
         window.events.loaded += _on_loaded
     except Exception:
         log_problem("load: backend exposes no loaded event; watchdog still runs")
@@ -6054,9 +6209,11 @@ def main():
                     if not (isinstance(v, str) and v.startswith("!"))]
         if answered and _page_ok(pr1):
             log_problem("load: verified, page booted")
+            _start_ok()
             return
         if not answered and not _boot_state["loaded"]:
             log_problem("load: probe could not reach the page; leaving it alone")
+            _start_ok()
             write_diag(["first check: no answer from the page; nothing touched"])
             return
         log_problem("load: page answered but NOT verified: %r" % (pr1,))
@@ -6083,6 +6240,7 @@ def main():
             pr2 = _probe(win)
             if _page_ok(pr2):
                 log_problem("load: recovered, page booted after inline load")
+                _start_ok()
                 write_diag(["second check: recovered"] + _probe_lines(pr2))
                 return
             write_diag(["second check: STILL NOT STARTING"] + _probe_lines(pr2))
@@ -6097,6 +6255,7 @@ def main():
         log_problem("load: watchdog armed")
     except Exception:
         log_problem("load: watchdog could not be started", sys.exc_info())
+        _start_ok()
 
     # gui=None lets pywebview pick the best native backend for the platform
     # (Edge WebView2 on Windows, WKWebView on macOS, WebKitGTK/Qt on Linux).
