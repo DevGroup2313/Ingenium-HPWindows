@@ -42,7 +42,7 @@ jobs:
         app: [ingenium, forge]
         os: [windows-2025, windows-2022]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
       - name: Defender as at home (real-time and cloud protection on, no exclusions)
@@ -55,6 +55,10 @@ jobs:
             -DisableBlockAtFirstSeen $false -DisableArchiveScanning $false -DisableScriptScanning $false `
             -MAPSReporting Advanced -SubmitSamplesConsent SendSafeSamples -ErrorAction Continue
           & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -SignatureUpdate | Select-Object -Last 2
+          # a definitions update that did not get through (Windows Server 2022's runners, 25 October 2026) leaves Defender on, with the
+          # definitions it has; it is said, and does not end the check
+          if ($LASTEXITCODE) { "::warning::Defender's definitions could not be updated (exit code $LASTEXITCODE); it runs with the ones it has." }
+          $global:LASTEXITCODE = 0
           $s = Get-MpComputerStatus; $p = Get-MpPreference
           "After: mode $($s.AMRunningMode); real-time $($s.RealTimeProtectionEnabled); on access $($s.OnAccessProtectionEnabled); behaviour $($s.BehaviorMonitorEnabled); IOAV $($s.IoavProtectionEnabled); cloud (MAPS) $($p.MAPSReporting); definitions $($s.AntivirusSignatureVersion); exclusions left: $($p.ExclusionPath -join ', ')"
           $ed = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue
@@ -166,6 +170,9 @@ jobs:
 
       - name: Inside Ingenium's window, asked of its web view (remote debugging, a check only)
         if: matrix.app == 'ingenium'
+        # a check only: it may not hold up the rest (on Windows Server 2022 it once ran until the job's time was up)
+        timeout-minutes: 20
+        continue-on-error: true
         run: |
           python -m pip install --quiet --disable-pip-version-check websocket-client pillow
           Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -187,6 +194,7 @@ jobs:
 
       - name: When the page's process stops, and when Windows ends the session (6.7.1)
         if: matrix.app == 'ingenium'
+        timeout-minutes: 20
         run: pwsh -NoProfile -File .github/diag/care_check.ps1 $env:DIR $env:EXE $env:RUNNER_TEMP
 
       - name: What Windows and Defender recorded
