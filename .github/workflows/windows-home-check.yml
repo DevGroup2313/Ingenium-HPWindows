@@ -15,6 +15,8 @@
 # Windows 10). Each app is now also watched for what Windows calls Not responding (.github/diag/hang_watch.ps1), from its
 # first start and while its pages are driven through its web view (.github/diag/cdp_drive.py), on Windows Server 2025
 # (Windows 11's generation) and Windows Server 2022 (Windows 10's).
+# 6.7.1: Ingenium's page is loaded again when its process ends, Windows ending the session counts as a run that finished,
+# and the stored work stays where it is unless the page did not come up twice (.github/diag/care_check.ps1).
 # It publishes nothing.
 name: Windows, as on a laptop at home
 
@@ -182,6 +184,10 @@ jobs:
           try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:17953/ingenium.html' -Headers @{ 'Sec-Fetch-Dest' = 'document' } -TimeoutSec 60 -UseBasicParsing; "status $($r.StatusCode), $($r.RawContentLength) bytes, $([math]::Round($sw.Elapsed.TotalSeconds,1)) s" } catch { "failed: $($_.Exception.Message)" }
           "--- the app's log"; Get-Content (Join-Path $env:DIR 'ingenium_crash.log') -Tail 40
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+
+      - name: When the page's process stops, and when Windows ends the session (6.7.1)
+        if: matrix.app == 'ingenium'
+        run: pwsh -NoProfile -File .github/diag/care_check.ps1 $env:DIR $env:EXE $env:RUNNER_TEMP
 
       - name: What Windows and Defender recorded
         if: always()
