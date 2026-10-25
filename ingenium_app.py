@@ -401,6 +401,37 @@ def _read_device_info():
     return info
 
 
+class _IngSafeRedirect(urllib.request.HTTPRedirectHandler):
+    """6.7 (app_relay_67.py): a redirect to another host, or from https to http, keeps no header that carries a key."""
+    _SECRET = ("authorization", "proxy-authorization", "cookie", "x-api-key", "api-key", "x-goog-api-key",
+               "x-subscription-token", "anthropic-api-key", "openai-organization")
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = urllib.request.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
+        if new is None:
+            return None
+        try:
+            a, b = urllib.parse.urlsplit(req.full_url), urllib.parse.urlsplit(new.full_url)
+            moved = (a.hostname or "").lower() != (b.hostname or "").lower() or (a.port != b.port)
+            downgraded = a.scheme.lower() == "https" and b.scheme.lower() != "https"
+            if moved or downgraded:
+                for k in list(new.headers.keys()):
+                    lk = k.lower()
+                    if lk in self._SECRET or "token" in lk or "secret" in lk or "password" in lk or lk.endswith("key"):
+                        del new.headers[k]
+        except Exception:
+            return None
+        return new
+
+
+def _ing_urlopen(req, timeout, ctx):
+    """urlopen with the safe redirect (6.7, app_relay_67.py)."""
+    handlers = [_IngSafeRedirect()]
+    if ctx is not None:
+        handlers.append(urllib.request.HTTPSHandler(context=ctx))
+    return urllib.request.build_opener(*handlers).open(req, timeout=timeout)
+
+
 def _relay_urllib(url, method, headers, body):
     """The ordinary path: urllib. Every module it needs is imported at the top
     of this file so the frozen app always has it. HTTPS answers are verified
@@ -420,8 +451,7 @@ def _relay_urllib(url, method, headers, body):
         ctx = ssl.create_default_context(cafile=_CERT_FILE) if _CERT_FILE else ssl.create_default_context()
     except Exception:
         ctx = None
-    with urllib.request.urlopen(req, timeout=300,
-                                context=ctx if url.startswith("https://") else None) as resp:
+    with _ing_urlopen(req, 300, ctx if url.startswith("https://") else None) as resp:
         raw = resp.read()
         try:
             text = raw.decode("utf-8")
@@ -508,7 +538,7 @@ def _relay_open(url, method, headers, data, timeout):
     if url.lower().startswith("https://"):
         ctx = ssl.create_default_context(cafile=_CERT_FILE) if _CERT_FILE else ssl.create_default_context()
     try:
-        resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+        resp = _ing_urlopen(req, timeout, ctx)
         return int(resp.status), resp
     except urllib.error.HTTPError as he:
         return int(he.code), he
@@ -5798,6 +5828,40 @@ def _prepare_windows_graphics(prior_bad):
     return True
 
 
+def _guard_bridge_frames():
+    """6.7 (app_frames_67.py): on a Mac, answer a call from the page only when it comes from the main frame of the app's own
+    address, never from a frame inside it (pywebview's message handler is defined in every frame and does not check)."""
+    if sys.platform != "darwin":
+        return
+    try:
+        import objc
+        from webview.platforms import cocoa as _pc
+        base = _pc.BrowserView.JSBridge
+        if getattr(base, "_ing_guarded", False):
+            return
+
+        class IngeniumFrameGuardedJSBridge(base):
+            def userContentController_didReceiveScriptMessage_(self, controller, message):
+                try:
+                    info = message.frameInfo()
+                    if info is None or not info.isMainFrame():
+                        return
+                    origin = info.securityOrigin()
+                    host = str(origin.host() or "") if origin is not None else ""
+                    proto = str(origin.protocol() or "").lower() if origin is not None else ""
+                    # the app's own address; or the app's own fallbacks (the page given inline, or as a file), never a website
+                    if not (host in ("127.0.0.1", "localhost") or proto in ("file", "about") or (proto == "" and host == "")):
+                        return
+                except Exception:
+                    return
+                objc.super(IngeniumFrameGuardedJSBridge, self).userContentController_didReceiveScriptMessage_(controller, message)
+
+        IngeniumFrameGuardedJSBridge._ing_guarded = True
+        _pc.BrowserView.JSBridge = IngeniumFrameGuardedJSBridge
+    except Exception:
+        log_problem("guard of the page's calls to the app could not be set", sys.exc_info())
+
+
 def main():
     global _APP_HTML_PATH
     if _another_copy_is_open():
@@ -6074,6 +6138,7 @@ def main():
             # the func/args positionals, and rejecting them four times in a row
             # would keep the app from opening at all. The right-press monitor
             # installs from its own thread instead.
+            _guard_bridge_frames()  # 6.7 (app_frames_67.py)
             webview.start(**kwargs)
             _started = True
             _engine_stop()
