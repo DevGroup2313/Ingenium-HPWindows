@@ -1,9 +1,9 @@
 Ingenium for Windows: build kit
 ===============================
 
-Kit made on 11 October 2026 by Ingenium's builder, from the Windows app's
-files (commit 95972bb of yabban-maker/Ingenium-Windows, stored in this page on
-11 October 2026).
+This guide was made on 11 October 2026, for version 3.2, by Ingenium's
+builder. The repository now holds a later version, which BUILD_INFO.txt names;
+where this guide and README.md differ, README.md is the newer.
 
 IN BRIEF
 
@@ -161,14 +161,17 @@ building, and its console window stays open to show any fault.
 
 Ingenium's models. At the top of the Models page, the card "Ingenium's models"
 shows four houses: Velox (the fastest), Scriba (it thinks before it answers),
-Magister (the strongest this PC can hold) and Faber (the coding model). The
-two built-in models are Velox and Scriba. Click Install on another, and the
-program downloads it from Hugging Face, checks it against its fixed
-fingerprint (its SHA-256 value) and keeps it; a download that stops resumes
-where it stopped. With enough memory, Magister is Qwen3.5 9B (about 5.7 GB)
-and Faber is Mellum2 12B-A2.5B Thinking (about 8.1 GB); with less, lighter
-models take their place. The figures shown for each model are its makers' own
-published results.
+Magister (a larger model for hard questions, chosen to suit this PC) and Faber
+(the coding model). The two built-in models are Velox and Scriba. Click
+Install on another, and the program downloads it from Hugging Face, checks it
+against its fixed fingerprint (its SHA-256 value) and keeps it; a download
+that stops resumes where it stopped. With 16 GB, Magister is Qwen3.5 9B (about
+5.7 GB) and Faber is Mellum2.1 12B Thinking (about 8.1 GB); with about 24 GB,
+Faber is Gemma 4 26B A4B (about 14.4 GB), and with about 32 GB or more,
+Qwen3-Coder 30B-A3B (about 18.6 GB). With less memory, lighter models take
+their place. On a PC whose graphics chip the engine cannot use, Magister is
+Qwen3.5 4B. The figures shown for each model are its makers' own published
+results.
 
 Convert a model. A model in another form (Hugging Face's safetensors,
 PyTorch's .bin or .pt, or MLX) becomes a GGUF here: choose all the files in
@@ -199,20 +202,17 @@ same card, under Use another computer's models, and press Connect. That
 device's chat then uses this PC's models over your home Wi-Fi, from another
 room. Keep Ingenium open here; while sharing is on, the PC does not go to
 sleep by itself. If the PC asks whether Ingenium may accept incoming
-connections (Windows Firewall, on private networks), allow it. Nothing leaves
-your home network, and only devices with the code are answered.
+connections (Windows Firewall, on private networks), allow it. Questions and
+replies go only to the computer you pair with, on the same network, and only
+devices with the code are answered. They are not encrypted, so share only on a
+network you trust, such as your home Wi-Fi. A short hello, with no code, tells
+devices on the network this computer's name and how many models it lends.
 
 8. YOUR COPY ON GITHUB
 
-The repository yabban-maker/Ingenium-Windows holds the same files. Keep it
-private, so only you can see them (on GitHub: Settings, then General, then
-Change visibility at the bottom). When this kit was made, the newest work sat
-on the branch claude/magical-darwin-ppq4pn. To make it the main version:
-
-1. Open https://github.com/yabban-maker/Ingenium-Windows and click Pull
-   requests, then New pull request.
-2. Set base to main and compare to claude/magical-darwin-ppq4pn.
-3. Click Create pull request twice, then Merge pull request and Confirm merge.
+If you uploaded this kit to a repository of your own (section 3), that
+repository holds the same files. Keep it private, so only you can see them (on
+GitHub: Settings, then General, then Change visibility at the bottom).
 
 9. IF SOMETHING GOES WRONG
 
@@ -229,70 +229,72 @@ The window stays empty or closes at once | The program writes
 
 10. WHAT WAS AND WAS NOT CHECKED
 
-Version 3.2 (10 October 2026) has not been built on GitHub yet: GitHub's build
-machines were not available when this kit was made, so these build files have
-not been run in the cloud for 3.2, and no 3.2 app has been tested on a PC.
-What was checked for 3.2, on a Linux computer: the app's own code trained a
-small model from zero with llama.cpp's trainer (release b11321, compiled with
-this kit's own settings): two passes over about 27,000 characters took about 8
-seconds, the loss fell after each pass, and the app's engine then continued a
-sentence with the trained model; the Train a small model from zero lesson
-passed 21 checks against the real trainer and engine, including training
-further and closing its window while it trains; the app's page passed its
-tests in Chromium on Linux, with the real engine (llama.cpp) running LFM2.5
-1.2B Instruct where a model was needed: Ingenium's ten rules reach every
-model's instructions (20 checks) and come before the person's own layer (9
-checks); tooltips above each control, in each page's own colours and font (15
-checks); the new sticky note papers, Lavender first, with their names (7
-checks); pasting from outside through the edit panel (12 checks, with a
-stand-in for the app's clipboard); the first reply no longer waits for the
-instructions (5 checks); building your own AI on top of a model (18 checks);
-the model lineup for each device (45 checks); Support (33 checks); the
-first-start downloads (24 checks); and the guided tour (22 checks). The
-converter turned LFM2.5 350M and Gemma 3 270M into F16, Q8_0 and Q4_K_M files
-identical byte for byte to those of llama.cpp's own converter and quantizer,
-in the browser, the Fire app and the computer app (27 checks each), and both
-converted models answered correctly. llama.cpp's published Windows engine,
-which the build downloads and checks against its SHA-256, was confirmed to
-carry no trainer, so GitHub's build compiles the trainer with Microsoft's
-compiler; that step has not run yet. The edit panel's clipboard code has not
-been run on Windows. The last build that passed on GitHub is version 3.1: The
-Windows app was built and tested on GitHub on 9 October 2026 (build
-3.1.20261009.13, at commit 3cdf465, on GitHub's Windows Server 2025). Its main
-download is Ingenium-Setup.exe (about 35 MB), an installer that needs no
-Python and no administrator password. On that machine, standing in for a
-laptop that had the earlier Python version: the installer ran without
-questions and finished in about 60 seconds with the two models beside it; it
-removed the Python version's files from the same folder, pointed the Desktop
-and Start menu shortcuts at the installed Ingenium.exe, put the engine beside
-it, and listed the app in Settings, Apps as version 3.1.20261009.13. The
-installed app's own engine loaded LFM2.5 1.2B Instruct in about 6.6 seconds,
-answered "Paris" to "What is the capital of France?" and refused a request
-without the session's key, and Qwen3.5 2B thought before answering "Is 91 a
-prime number?". From start to the engine's first answer, the installed app
-took 2.03, 0.60 and 0.59 seconds in three runs, against 4.24, 1.98 and 1.75
-seconds for the portable one-file Ingenium.exe. Run again as an update, the
-installer finished in about 15 seconds and kept the models; removed through
-its uninstaller, the app, its shortcuts and its entry in Settings, Apps were
-gone. Each time, stand-ins for the user's own files were kept. Lending its
-models: the installed app opened its door on the network (10.1.0.124, port
-17860), refused a wrong pairing code, and answered "Paris" through the door,
-its first word arriving after about 0.54 seconds. Given Velox's speed-up file,
-the app left it unused, as intended on a machine whose engine runs on the
-processor. This build is version 3.1 and carries the look approved on 9
-October 2026: chat bubbles that rise into place with a small spring when they
-first appear, lift under the pointer and breathe gently while an answer is
-being written (minimal motion and the system's reduce-motion setting turn this
-off); the raised 3D look with light shadows; and no purple glow around the
-door's seal, the purple keys or the app's icon, by day or by night. The look
-was checked in Chromium on Linux in day and night, on a computer screen and a
-phone screen. The guided tour (22 checks), Support (33 checks), the
-first-start downloads (24 checks) and the live thinking view (10 checks) were
-tested again in Chromium on Linux on this page. The build file "Build Ingenium
-(Windows).bat" now writes its own build number (3.1, the day and the time)
-into the page; that line has not been run on a Windows computer, because the
-file itself is not run on GitHub; if it fails, the build carries on without
-the number. The installer has not been run on a real Windows laptop, where
-SmartScreen will ask once (the installer is not code-signed) and antivirus
-checks may make it slower; the app's window has not been opened on one, and no
-Windows graphics chip has been tested.
+This section records the checks as they stood when this guide was made, on 11
+October 2026. Later versions have been built and tested on GitHub since; the
+repository's Actions and Releases pages show each build. Version 3.2 (10
+October 2026) had not been built on GitHub yet: GitHub's build machines were
+not available, so these build files had not been run in the cloud for 3.2, and
+no 3.2 app had been tested on a PC. What was checked for 3.2, on a Linux
+computer: the app's own code trained a small model from zero with llama.cpp's
+trainer (release b11321, compiled with this kit's own settings): two passes
+over about 27,000 characters took about 8 seconds, the loss fell after each
+pass, and the app's engine then continued a sentence with the trained model;
+the Train a small model from zero lesson passed 21 checks against the real
+trainer and engine, including training further and closing its window while it
+trains; the app's page passed its tests in Chromium on Linux, with the real
+engine (llama.cpp) running LFM2.5 1.2B Instruct where a model was needed:
+Ingenium's ten rules reach every model's instructions (20 checks) and come
+before the person's own layer (9 checks); tooltips above each control, in each
+page's own colours and font (15 checks); the new sticky note papers, Lavender
+first, with their names (7 checks); pasting from outside through the edit
+panel (12 checks, with a stand-in for the app's clipboard); the first reply no
+longer waits for the instructions (5 checks); building your own AI on top of a
+model (18 checks); the model lineup for each device (45 checks); Support (33
+checks); the first-start downloads (24 checks); and the guided tour (22
+checks). The converter turned LFM2.5 350M and Gemma 3 270M into F16, Q8_0 and
+Q4_K_M files identical byte for byte to those of llama.cpp's own converter and
+quantizer, in the browser, the Fire app and the computer app (27 checks each),
+and both converted models answered correctly. llama.cpp's published Windows
+engine, which the build downloads and checks against its SHA-256, was
+confirmed to carry no trainer, so GitHub's build compiles the trainer with
+Microsoft's compiler; that step has not run yet. The edit panel's clipboard
+code had not been run on Windows. The last build that had passed on GitHub
+then was version 3.1: The Windows app was built and tested on GitHub on 9
+October 2026 (build 3.1.20261009.13, at commit 3cdf465, on GitHub's Windows
+Server 2025). Its main download is Ingenium-Setup.exe (about 35 MB), an
+installer that needs no Python and no administrator password. On that machine,
+standing in for a laptop that had the earlier Python version: the installer
+ran without questions and finished in about 60 seconds with the two models
+beside it; it removed the Python version's files from the same folder, pointed
+the Desktop and Start menu shortcuts at the installed Ingenium.exe, put the
+engine beside it, and listed the app in Settings, Apps as version
+3.1.20261009.13. The installed app's own engine loaded LFM2.5 1.2B Instruct in
+about 6.6 seconds, answered "Paris" to "What is the capital of France?" and
+refused a request without the session's key, and Qwen3.5 2B thought before
+answering "Is 91 a prime number?". From start to the engine's first answer,
+the installed app took 2.03, 0.60 and 0.59 seconds in three runs, against
+4.24, 1.98 and 1.75 seconds for the portable one-file Ingenium.exe. Run again
+as an update, the installer finished in about 15 seconds and kept the models;
+removed through its uninstaller, the app, its shortcuts and its entry in
+Settings, Apps were gone. Each time, stand-ins for the user's own files were
+kept. Lending its models: the installed app opened its door on the network
+(10.1.0.124, port 17860), refused a wrong pairing code, and answered "Paris"
+through the door, its first word arriving after about 0.54 seconds. Given
+Velox's speed-up file, the app left it unused, as intended on a machine whose
+engine runs on the processor. This build is version 3.1 and carries the look
+approved on 9 October 2026: chat bubbles that rise into place with a small
+spring when they first appear, lift under the pointer and breathe gently while
+an answer is being written (minimal motion and the system's reduce-motion
+setting turn this off); the raised 3D look with light shadows; and no purple
+glow around the door's seal, the purple keys or the app's icon, by day or by
+night. The look was checked in Chromium on Linux in day and night, on a
+computer screen and a phone screen. The guided tour (22 checks), Support (33
+checks), the first-start downloads (24 checks) and the live thinking view (10
+checks) were tested again in Chromium on Linux on this page. The build file
+"Build Ingenium (Windows).bat" now writes its own build number (3.1, the day
+and the time) into the page; that line has not been run on a Windows computer,
+because the file itself is not run on GitHub; if it fails, the build carries
+on without the number. The installer has not been run on a real Windows
+laptop, where SmartScreen will ask once (the installer is not code-signed) and
+antivirus checks may make it slower; the app's window had not been opened on
+one, and no Windows graphics chip has been tested.

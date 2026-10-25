@@ -55,11 +55,10 @@ window, the engine used to stop at "Loading model 95%" for ever, because the
 browser refused to start its worker from a file. It now starts, and if
 anything ever stops it, the load ends with a reason instead of waiting.
 
-For an app-like window with the Ingenium icon, without building anything:
-  1. Open ingenium.html in Microsoft Edge.
-  2. Click the "..." menu, then Apps, then "Install this site as an app".
-It then behaves like a native app with its own window and icon, and works
-offline afterwards.
+For a window of its own with the Ingenium icon, install Ingenium-Setup.exe
+(above). Do not put ingenium.html online to make one: the licence does not
+allow it to be hosted or shared without the owner's permission (LICENCE.txt,
+section 5).
 
 
 2. Build it as a proper Windows app (Ingenium.exe)
@@ -145,8 +144,12 @@ devices. Settings, "Your models on every device":
     enter the address and code it shows on the other device. If Windows
     Firewall asks, allow Ingenium on private networks. While
     sharing is on, the PC does not go to sleep by itself.
-Nothing leaves your home network, and only devices with the code are
-answered. If the name does not work, use the number address it shows.
+Questions and replies go only to the computer you pair with, on the same
+network, and only devices with the code are answered. They are not
+encrypted, so share only on a network you trust, such as your home Wi-Fi. A
+short hello, with no code, tells devices on the network this computer's name
+and how many models it lends. If the name does not work, use the number
+address it shows.
 
 
 Adding models
@@ -196,8 +199,11 @@ ingenium.html is the whole app.
 
 What the app connects to
 ------------------------
-Nothing, by itself. It connects only when you turn a connection on in
-Settings (Ollama on another computer, or a cloud provider such as Claude).
+Nothing, by itself. It goes online only when you ask for something that
+needs it: a connection you turn on in Settings (Ollama on another computer,
+or a cloud provider such as Claude), a model you install, a web search,
+GitHub, a look-up of a reference in Fontes, Dictate where the speech service
+is online, or Scriba's speech model the first time you record.
 The app's own engine listens only on this PC (a loopback address nothing
 outside the PC can reach) and refuses any request without the app's private
 key. The build step is different: it downloads its tools, the engine and the

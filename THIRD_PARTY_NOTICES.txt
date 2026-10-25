@@ -100,11 +100,13 @@ SOFTWARE.
    - Qwen3.5 2B by the Qwen team (Alibaba Cloud), in the iPhone, iPad, Mac
      and Windows apps: under the Apache License 2.0
      (licences/Apache-2.0-Qwen3.5.txt).
-   Models installed later from the Models page are not carried in the apps;
-   each is downloaded from Hugging Face only when asked for, under its own
-   licence: LFM2.5 2.6B (Liquid AI, LFM Open License v1.0), Qwen3.5 4B and
-   Qwen3.5 9B (the Qwen team, Apache License 2.0) and Mellum2 12B-A2.5B
-   Thinking (JetBrains, Apache License 2.0).
+   Models installed later, from the Models page or More models, are not
+   carried in the apps. Each is downloaded from Hugging Face only when asked
+   for, under its own licence, which the Models page names for each model:
+   the Apache License 2.0, the MIT License, the LFM Open License v1.0
+   (commercial use limited to organisations with annual revenue under 10
+   million US dollars), the Gemma Terms of Use or the Llama 3.2 Community
+   License.
    On the Mac and Windows apps, the optional speed-up files are Liquid AI's
    DSpark draft models for LFM2.5 1.2B Instruct and LFM2.5 2.6B, also
    downloaded only when asked for, under the LFM Open License v1.0.
