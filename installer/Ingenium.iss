@@ -27,7 +27,7 @@
   #define AppIdent "com.yannieforest.ingenium"
 #endif
 #ifndef AppVersion
-  #define AppVersion "6.7"
+  #define AppVersion "6.8"
 #endif
 #ifndef VerNum
   #define VerNum "3.2.0.0"
@@ -112,8 +112,8 @@ Source: "{src}\models\builtin.json"; DestDir: "{app}\models"; Flags: external sk
 Source: "{src}\models\*"; DestDir: "{app}\models"; Flags: external skipifsourcedoesntexist onlyifdoesntexist recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppFile}.exe"; WorkingDir: "{app}"; Comment: "{#AppName}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppFile}.exe"; WorkingDir: "{app}"; Comment: "{#AppName}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppFile}.exe"; WorkingDir: "{app}"; Comment: "{#AppName}"; AppUserModelID: "{#AppIdent}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppFile}.exe"; WorkingDir: "{app}"; Comment: "{#AppName}"; AppUserModelID: "{#AppIdent}"
 
 [Run]
 Filename: "{app}\{#AppFile}.exe"; Description: "Open {#AppName} now"; Flags: nowait postinstall skipifsilent

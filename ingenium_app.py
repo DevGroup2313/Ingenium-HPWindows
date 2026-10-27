@@ -6033,8 +6033,24 @@ def _guard_bridge_frames():
         log_problem("guard of the page's calls to the app could not be set", sys.exc_info())
 
 
+APP_USER_MODEL_ID = re.sub(r"[^A-Za-z0-9.]", "", str(_APP_CFG.get("app_id") or ""))[:120] or "com.yannieforest.ingenium"
+
+
+def _own_taskbar_identity():
+    """6.8 (app_id_68): this app's own identity on Windows (its AppUserModelID), set before any window, so its taskbar button,
+    its pins and its Start menu entry are its own, even when it runs from the kit's script as pythonw.exe."""
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception as exc:
+        log_problem("taskbar identity: not set (%s)" % (exc,))
+
+
 def main():
     global _APP_HTML_PATH
+    _own_taskbar_identity()
     if _another_copy_is_open():
         return
     app_html = find_app_html()
