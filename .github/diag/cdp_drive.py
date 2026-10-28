@@ -83,7 +83,8 @@ def sample(name, seconds, then=None):
 
 
 # 1. starting: until the page says it is ready (or two minutes), sampled
-ready_expr = "!!(window.__ingReady===true||window.__forgeReady===true||document.readyState==='complete'&&window.__INGENIUM_BOOTED)"
+# the Forge marks itself ready on its body (data-forge-ready="1"), as its own app reads it; window.__forgeReady is never set
+ready_expr = "!!(window.__ingReady===true||window.__forgeReady===true||document.body&&document.body.getAttribute('data-forge-ready')==='1'||document.readyState==='complete'&&window.__INGENIUM_BOOTED)"
 a = time.time()
 lat = []
 while time.time() - a < 120:

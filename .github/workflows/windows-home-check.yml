@@ -154,6 +154,10 @@ jobs:
         run: |
           python -m pip install --quiet --disable-pip-version-check websocket-client
           Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
+          # the web view's own processes too: one left from the rounds above may be taken up again by the next start, and
+          # then the debugging port below is not opened (on Windows Server 2025, 28 October: no page target in 180 s)
+          for ($i = 0; $i -lt 20 -and @(Get-Process msedgewebview2 -ErrorAction SilentlyContinue).Count; $i++) { Get-Process msedgewebview2 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1 }
+          "Web view processes left before the driven start: $(@(Get-Process msedgewebview2 -ErrorAction SilentlyContinue).Count)"
           Start-Sleep -Seconds 3
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9334'
           $hw = Join-Path $env:RUNNER_TEMP "hang-drive-${{ matrix.app }}.json"; $dr = Join-Path $env:RUNNER_TEMP "drive-${{ matrix.app }}.json"
