@@ -4956,6 +4956,18 @@ _QUICK_DEFER = ("ing-builtin-cd", "ing-builtin-forge", "ing-builtin-inkwell", "i
 _QUICK_CACHE = {"key": None, "page": None, "parts": {}}
 
 
+def _quick_take_tails(text, parts):
+    """6.8.1: the blocks a page carries at its end (build/tail.py), taken out; each place names this app instead."""
+    found = list(re.finditer(rb'<script id="ing-tail:([^"]+)"[^>]*>([^<]*)</script>\n?', text))
+    for m in reversed(found):
+        text = text[:m.start()] + text[m.end():]
+    for m in found:
+        ident = m.group(1)
+        parts[ident.decode()] = m.group(2)
+        text = text.replace(b'data-defer="#ing-tail:' + ident + b'"', b'data-defer="/_payload/' + ident + b'"', 1)
+    return text
+
+
 def _quick_page(html_path):
     """(page, parts): the page with the carried blocks left empty, each naming where it is, and the blocks themselves."""
     try:
@@ -4965,6 +4977,7 @@ def _quick_page(html_path):
             return _QUICK_CACHE["page"], _QUICK_CACHE["parts"]
         text = open(html_path, "rb").read()
         parts = {}
+        text = _quick_take_tails(text, parts)
         for ident in _QUICK_DEFER:
             m = re.search(rb'(<script\b[^>]*\bid="' + re.escape(ident.encode()) + rb'"[^>]*)>([^<]*)</script>', text)
             if not m or len(m.group(2)) < 1024:
