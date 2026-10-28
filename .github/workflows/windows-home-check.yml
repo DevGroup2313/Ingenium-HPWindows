@@ -151,6 +151,10 @@ jobs:
           foreach ($l in $logs) { if (Test-Path $l) { "--- $l"; ReadText $l } else { "--- $l (not written)" } }
 
       - name: Not responding? Watched while its pages are driven (remote debugging, a check only)
+        # a check only: it may not hold up the rest. On Windows Server 2025 (web view 155) no page answers on the debugging
+        # port, even with no web view left running (28 October 2026); the app itself started and answered there each time.
+        timeout-minutes: 20
+        continue-on-error: true
         run: |
           python -m pip install --quiet --disable-pip-version-check websocket-client
           Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($env:DIR) } | Stop-Process -Force -ErrorAction SilentlyContinue
