@@ -221,7 +221,7 @@ jobs:
 
       - name: Keep the screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: screens-${{ matrix.app }}-${{ matrix.os }}
           path: |
