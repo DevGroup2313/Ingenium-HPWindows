@@ -1647,6 +1647,19 @@ def _lite_start(prior_bad):
     _lite_mark(False)
 
 
+def _open_url(url):
+    """6.9.1: an https address, opened in the computer's own browser (GitHub's sign-in page, a build on GitHub)."""
+    import webbrowser
+    u = str(url or "").strip()
+    bad = any(ch in u for ch in " \t\r\n<>\"'")
+    if bad or not u.lower().startswith("https://") or len(u) < 9:
+        return {"ok": False, "error": "only an https address can be opened"}
+    try:
+        return {"ok": bool(webbrowser.open(u))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 class IngeniumApi(_LiteWindows):
     """JS API exposed to the main window as window.pywebview.api.
 
@@ -1697,6 +1710,9 @@ class IngeniumApi(_LiteWindows):
 
     def take_screenshot(self):
         return _take_screenshot()
+
+    def open_url(self, url):
+        return _open_url(url)
 
     def read_clipboard(self):
         return _clipboard_read()
@@ -1966,6 +1982,9 @@ class IngeniumApiSingle(_LiteWindows):
 
     def take_screenshot(self):
         return _take_screenshot()
+
+    def open_url(self, url):
+        return _open_url(url)
 
     def read_clipboard(self):
         return _clipboard_read()
