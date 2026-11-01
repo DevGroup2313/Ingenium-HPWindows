@@ -151,6 +151,26 @@ short hello, with no code, tells devices on the network this computer's name
 and how many models it lends. If the name does not work, use the number
 address it shows.
 
+Lending from this laptop, step by step (6.9.3):
+  * Plug it in. In Settings, System, Power, set sleep when plugged in to
+    Never; in Control Panel, Power Options, "Choose what closing the lid
+    does", pick Do nothing when plugged in.
+  * Use your home Wi-Fi, not a guest one, and set its Network profile type to
+    Private network.
+  * When Windows asks whether Ingenium may accept connections, tick Private
+    networks only and press Allow access. (If the question went away: Windows
+    Security, Firewall and network protection, Allow an app through
+    firewall, Change settings, tick Private for Ingenium.)
+  * Switch sharing on, leave Ingenium open (minimised is fine), and ask your
+    router for a fixed address for the laptop.
+  * Use the same model on every device: a different one makes the first wait.
+  * Ingenium's own card says how much memory each lent model is given
+    ("Memory for lent models"), whether it uses the processor or the
+    graphics chip ("Graphics": Automatic, Processor only, Graphics chip; on a
+    laptop with a weak chip, Automatic uses the processor), and which models
+    are quick on this laptop. A device that asks while another is being
+    answered is told it is waiting, and its turn comes.
+
 
 Adding models
 -------------
