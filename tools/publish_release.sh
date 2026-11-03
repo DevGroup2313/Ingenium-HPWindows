@@ -17,11 +17,27 @@ TAG="latest"
 APP="${APP_NAME:-Ingenium}"
 TITLE="$APP for $PLATFORM (latest build)"
 NOTES_FILE="${RUNNER_TEMP:-/tmp}/notes.md"
+# 6.8: every branch publishes to this one release, so a build never replaces a newer one of the same platform: an older
+# branch's build (its version is lower) is kept with its own run only. (The Forge's Fire APK was replaced so, 25 October 2026.)
+HAVE="$(gh release view "$TAG" --json body --jq .body 2>/dev/null | sed -n 's/.*shows in About: \*\*\([^*]*\)\*\*.*/\1/p' | head -n 1 || true)"
+# 6.9.1: a build number is <version>.<day>.<run>, and the version may have two parts (6.9) or three (6.9.1); to compare two
+# builds, a two-part version is given a third part of 0, so 6.9.1.20261031.77 is seen as newer than 6.9.20261030.76.
+norm_build() { printf '%s' "$1" | sed -E 's/^([0-9]+\.[0-9]+)\.([0-9]{8}\.[0-9]+)$/\1.0.\2/'; }
+if [ -n "$HAVE" ] && [ -n "${INGENIUM_VERSION:-}" ] && [ "$HAVE" != "${INGENIUM_VERSION:-}" ] && [ "$(printf '%s\n%s\n' "$(norm_build "$HAVE")" "$(norm_build "${INGENIUM_VERSION:-}")" | sort -V | tail -n 1)" = "$(norm_build "$HAVE")" ]; then
+  echo "::warning::The Releases page already has build $HAVE for $PLATFORM, newer than this build (${INGENIUM_VERSION:-}). It stays there; this build is kept with its run only."
+  exit 0
+fi
 
 git tag -f "$TAG" "$GITHUB_SHA"
-git push -f origin "refs/tags/$TAG" || echo "(the tag could not be moved; the files are still replaced)"
-gh release view "$TAG" > /dev/null 2>&1 || \
-  gh release create "$TAG" --title "$TITLE" --notes "Building..." --latest || true
+if ! git push -f origin "refs/tags/$TAG"; then
+  echo "(the tag could not be moved, so the release stays where it is; the files are still replaced)"
+  git tag -d "$TAG" > /dev/null 2>&1 || true
+fi
+if ! gh release view "$TAG" > /dev/null 2>&1; then
+  gh release create "$TAG" --title "$TITLE" --notes "Building..." --latest \
+    || { git fetch -q origin "refs/tags/$TAG:refs/tags/$TAG" 2>/dev/null || true; gh release view "$TAG" > /dev/null 2>&1; } \
+    || { echo "::error::the release '$TAG' could not be made"; exit 1; }
+fi
 echo "### Published to Releases" >> "$GITHUB_STEP_SUMMARY"
 # R74: files this build no longer makes (OBSOLETE, names separated by spaces)
 # are taken off the release, so an old copy is never mistaken for a new one

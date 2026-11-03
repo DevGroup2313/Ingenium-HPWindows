@@ -1,0 +1,275 @@
+INGENIUM: THIRD-PARTY NOTICES
+=============================
+
+Ingenium itself is the work of Yannie D. Forest; see LICENCE.txt. The apps
+also carry the following open-source software and models, under their own
+licences, reproduced here as those licences require.
+
+1. llama.cpp (the native engine in every Ingenium app: Android, Fire, iPhone,
+   iPad, Mac and Windows)
+   https://github.com/ggml-org/llama.cpp, release b11321
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2023-2026 The ggml authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+   llama.cpp includes nlohmann/json (MIT):
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2013-2025 Niels Lohmann
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+   The page's model converter (from version 3.0) carries quantization routines
+   adapted from llama.cpp's ggml-quants.c, in JavaScript and compiled to
+   WebAssembly, under the same MIT licence and copyright notice as above. Its
+   list of tokenizer fingerprints comes from llama.cpp's converter
+   (conversion/base.py), under the same licence.
+
+2. wllama (the WebAssembly engine inside ingenium.html: the engine in a
+   browser, and the fallback in the desktop apps),
+   https://github.com/ngxson/wllama, version 3.6.1
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2024 Xuan Son NGUYEN
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+3. AndroidX WebKit (Android and Fire app), Apache License 2.0
+   https://developer.android.com/jetpack/androidx/releases/webkit
+   The full text of the Apache License 2.0 is in licences/Apache-2.0-Qwen3.5.txt.
+
+4. Built-in models (two in each app, from version 3.0)
+   - LFM2.5 1.2B Instruct by Liquid AI, in every app, and LFM2.5 1.2B
+     Thinking by Liquid AI, in the Android and Fire app: under the LFM Open
+     License v1.0 (licences/LFM-Open-License-v1.0.txt). It permits use and
+     redistribution; commercial use is limited to organisations with annual
+     revenue under 10 million US dollars.
+   - Qwen3.5 2B by the Qwen team (Alibaba Cloud), in the iPhone, iPad, Mac
+     and Windows apps: under the Apache License 2.0
+     (licences/Apache-2.0-Qwen3.5.txt).
+   Models installed later, from the Models page or More models, are not
+   carried in the apps. Each is downloaded from Hugging Face only when asked
+   for, under its own licence, which the Models page names for each model:
+   the Apache License 2.0, the MIT License, the LFM Open License v1.0
+   (commercial use limited to organisations with annual revenue under 10
+   million US dollars), the Gemma Terms of Use or the Llama 3.2 Community
+   License.
+   On the Mac and Windows apps, the optional speed-up files are Liquid AI's
+   DSpark draft models for LFM2.5 1.2B Instruct and LFM2.5 2.6B, also
+   downloaded only when asked for, under the LFM Open License v1.0.
+
+5. The Mac and Windows apps' window and packaging
+   These are carried inside the desktop apps, each under its own licence
+   (the texts are at the addresses given):
+   - Python, Python Software Foundation License, https://docs.python.org/3/license.html
+   - pywebview, BSD 3-Clause License, https://github.com/r0x0r/pywebview
+   - PyInstaller's bootloader, GPL 2.0 with an exception that permits
+     distributing programs built with it, https://pyinstaller.org/en/stable/license.html
+   - pythonnet (Windows), MIT License, https://github.com/pythonnet/pythonnet
+   - PyObjC (Mac), MIT License, https://github.com/ronaldoussoren/pyobjc
+   - certifi, Mozilla Public License 2.0, https://github.com/certifi/python-certifi
+   - The LLVM OpenMP runtime (libomp, inside the Windows engine), Apache
+     License 2.0 with LLVM Exceptions, https://openmp.llvm.org; its licence
+     text travels with the engine as LICENSE-LLVM-OpenMP.
+
+6. Ingenium's eyes (the picture reader inside ingenium.html, from 6.2)
+   Ingenium looks at a picture on the device, with nothing fetched, using
+   these components, each under the Apache License 2.0 (its full text is in
+   licences/Apache-2.0-Qwen3.5.txt). Settings shows the same notices.
+   - TensorFlow.js 4.22.0 (@tensorflow/tfjs, dist/tf.min.js)
+     Copyright 2018-2024 Google LLC. https://github.com/tensorflow/tfjs
+   - MobileNet v2, 1.0, 224 x 224, with its ImageNet class names (as
+     published for @tensorflow-models/mobilenet 2.1.1)
+     Copyright 2019 Google LLC.
+     https://github.com/tensorflow/tfjs-models/tree/master/mobilenet
+     Changed here: the weights are stored in eight bits each; the network
+     itself is unchanged.
+   - Tesseract.js 5.1.1 (dist/tesseract.min.js and dist/worker.min.js)
+     Copyright 2016 Jerome Wu and the Tesseract.js contributors.
+     https://github.com/naptha/tesseract.js
+   - Tesseract.js-core 5.1.1 (Tesseract OCR compiled to WebAssembly)
+     Tesseract: Copyright 2006 Google Inc. and the Tesseract contributors.
+     https://github.com/naptha/tesseract.js-core
+     https://github.com/tesseract-ocr/tesseract
+   - English trained data, 4.0.0_best_int (@tesseract.js-data/eng 1.0.0,
+     from tessdata_best). Copyright Google Inc. and the Tesseract
+     contributors. https://github.com/tesseract-ocr/tessdata_best
+   Bundled inside Tesseract.js's two files, as their own notes list them:
+   regenerator-runtime, Copyright (c) 2014-present Facebook, Inc. (MIT
+   License); buffer, by Feross Aboukhadijeh (MIT License); ieee754, by
+   Feross Aboukhadijeh (BSD 3-Clause License); zlib.js, Copyright 2012
+   imaya (MIT License). Their licences:
+
+   MIT License (regenerator-runtime, buffer, zlib.js; each with its own
+   copyright notice above):
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be included
+   in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   BSD 3-Clause License (ieee754, Copyright (c) 2008, Fair Oaks Labs, Inc.):
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are
+   met:
+
+   1. Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+   2. Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+   3. Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+   IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+   TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+   PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+   TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+7. The fonts of Lector's documents (inside ingenium.html)
+   - Cormorant, by Christian Thalmann (Catharsis Fonts), weights 500, 600
+     and 700 and 500 italic. https://github.com/CatharsisFonts/Cormorant
+   - Cinzel, by Natanael Gama, weight 600.
+     https://github.com/NDISCOVER/Cinzel
+   Each under the SIL Open Font License, Version 1.1
+   (https://openfontlicense.org): the fonts may be used, embedded and
+   redistributed with software, but not sold by themselves. Each font file
+   keeps its copyright notice and licence in its own metadata.
+
+8. CodeMirror 6 (the code editor inside ingenium.html, from 6.3), with its
+   parsers (Lezer), https://codemirror.net, https://lezer.codemirror.net
+   codemirror 6.0.2; @codemirror/autocomplete 6.20.4, commands 6.11.1,
+   language 6.13.1, legacy-modes 6.5.5, lint 6.9.7, merge 6.12.3, search
+   6.7.2, state 6.7.6, view 6.43.15, and the languages cpp 6.0.3, css 6.3.1,
+   html 6.4.12, java 6.0.2, javascript 6.2.5, json 6.0.2, markdown 6.5.2,
+   php 6.0.2, python 6.2.1, rust 6.0.2, sql 6.10.0, xml 6.1.0, yaml 6.1.3;
+   @lezer/common 1.5.4, highlight 1.2.5, lr 1.4.11, and the grammars cpp
+   1.1.6, css 1.3.9, html 1.3.13, java 1.1.5, javascript 1.5.6, json 1.0.3,
+   markdown 1.8.1, php 1.0.6, python 1.1.19, rust 1.0.3, xml 1.0.6, yaml
+   1.0.4; style-mod 4.1.4, w3c-keyname 2.2.8, crelt 1.0.7 and
+   @marijn/find-cluster-break 1.0.4. Each package names its own years.
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (C) 2016-2024 by Marijn Haverbeke <marijn@haverbeke.berlin> and
+others
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+9. Fluent Emoji (the pictures on the side keys on Windows 10, inside
+   ingenium.html, from 6.7.1), seven of Microsoft's flat drawings, unchanged
+   https://github.com/microsoft/fluentui-emoji
+--------------------------------------------------------------------------
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -1,0 +1,11 @@
+# made by the builds; never committed
+build/
+dist/
+.buildenv/
+engine/
+models/
+build_log.txt
+selftest.json
+__pycache__/
+ingenium_crash.log
+ingenium_diag.txt

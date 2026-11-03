@@ -122,7 +122,7 @@ if "!TOOLS_OK!"=="1" (
     rem R75: proxy_tools, a small part of pywebview, is published only as source
     call :runlive "'%VPY%' -m pip install --no-index --find-links wheels setuptools wheel"
     call :runlive "'%VPY%' -m pip install --no-index --find-links wheels --no-build-isolation proxy_tools"
-    call :runlive "'%VPY%' -m pip install --no-index --find-links wheels --only-binary=:all: pyinstaller pywebview"
+    call :runlive "'%VPY%' -m pip install --no-index --find-links wheels --only-binary=:all: pyinstaller pywebview certifi"
     if errorlevel 1 goto tools_failed
   ) else (
     call :say "Downloading and installing them now (about 25 MB, one time;"
@@ -132,7 +132,7 @@ if "!TOOLS_OK!"=="1" (
     rem (plain Python, installed in seconds); the rest must come ready-made
     call :runlive "'%VPY%' -m pip install --disable-pip-version-check proxy_tools"
     if errorlevel 1 goto tools_failed
-    call :runlive "'%VPY%' -m pip install --disable-pip-version-check --only-binary=:all: "pythonnet>=3.0.3" "pywebview>=5" "pyinstaller>=6""
+    call :runlive "'%VPY%' -m pip install --disable-pip-version-check --only-binary=:all: "pythonnet>=3.0.3" "pywebview>=5" "pyinstaller>=6" certifi"
     if errorlevel 1 goto tools_failed
   )
 )
@@ -184,7 +184,7 @@ if exist dist rmdir /s /q dist
 rem R77: this build's own number (the version, the day and the time it was
 rem built), shown in About, as the cloud builds show theirs
 set "BUILD_NO="
-for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=3.2.%%B"
+for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=6.9.3.%%B"
 if defined BUILD_NO (
   call :runlive "'%VPY%' tools\stamp_build.py ingenium.html !BUILD_NO!"
   call :say "Build number: !BUILD_NO!"
@@ -269,7 +269,7 @@ findstr /I /C:"no matching distribution" /C:"could not find a version" "%LOG%" >
 findstr /I /C:"could not resolve" /C:"failed to establish" /C:"network is unreachable" /C:"timed out" "%LOG%" >nul && (
   echo This step needs the internet once, to download PyInstaller and pywebview.
   echo Connect and run this again. To build with no connection, on any
-  echo connected PC run:   python -m pip download pyinstaller pywebview setuptools wheel -d wheels
+  echo connected PC run:   python -m pip download pyinstaller pywebview certifi setuptools wheel -d wheels
   echo then copy the wheels folder next to this file.
   call :say ""
 )
