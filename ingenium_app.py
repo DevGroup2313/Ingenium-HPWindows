@@ -3102,6 +3102,83 @@ def _page_not_up(window):
     return True
 
 
+def _page_save_target(name):
+    """Where she chooses, in the computer's own save dialog: (path, shown)."""
+    keep = " ._-()[]"
+    safe = "".join(c for c in str(name or "ingenium.html") if c.isalnum() or c in keep).strip() or "ingenium.html"
+    try:
+        import webview
+        ws = [x for x in (getattr(webview, "windows", None) or []) if x is not None]
+        if ws:
+            res = ws[0].create_file_dialog(webview.SAVE_DIALOG, save_filename=safe)
+            if not res:
+                return None, True
+            return (res if isinstance(res, str) else res[0]), True
+    except Exception:
+        log_problem("pages: save dialog unavailable", sys.exc_info())
+    try:
+        d = os.path.join(os.path.expanduser("~"), "Downloads")
+        if not os.path.isdir(d):
+            d = os.path.expanduser("~")
+        return os.path.join(d, safe), False
+    except Exception:
+        return None, False
+
+
+def _page_save(pid="", name="ingenium.html"):
+    """6.20 (app_page_620.py): the page running ("") or a version kept, copied where she chooses."""
+    pid = str(pid or "")
+    src = _page_file(pid) if pid else _APP_HTML_PATH
+    if not src or not os.path.isfile(src):
+        return {"ok": False, "error": "that page is not on this computer"}
+    with _SAVE_LOCK:
+        target, shown = _page_save_target(name)
+        if shown and not target:
+            return "cancelled"
+        if not target:
+            return {"ok": False, "error": "no folder to save it in"}
+        try:
+            shutil.copyfile(src, target)
+            log_problem("pages: %s saved to %s" % (pid or "the page running", target))
+            return target
+        except Exception as e:
+            log_problem("pages: saving the page failed", sys.exc_info())
+            return {"ok": False, "error": str(e)}
+
+
+def _page_export(piece, first=False, last=False, name="ingenium.html"):
+    """6.20 (app_page_620.py): the lighter copy, in pieces; on the last, made whole and written where she chooses."""
+    d = _pages_dir()
+    if not d:
+        return {"ok": False, "error": "this computer has no folder for pages"}
+    inc = os.path.join(d, "export.part")
+    try:
+        with _PAGE["lock"]:
+            with open(inc, "wb" if first else "ab") as fh:
+                fh.write(str(piece or "").encode("utf-8"))
+        if not last:
+            return {"ok": True, "bytes": os.path.getsize(inc)}
+        raw = open(inc, "rb").read()
+        try:
+            os.remove(inc)
+        except Exception:
+            pass
+        text, back, missing = _page_complete(raw)
+        with _SAVE_LOCK:
+            target, shown = _page_save_target(name)
+            if shown and not target:
+                return "cancelled"
+            if not target:
+                return {"ok": False, "error": "no folder to save it in"}
+            with open(target, "wb") as fh:
+                fh.write(text)
+        log_problem("pages: the lighter copy saved whole to %s (%d carried blocks put back; missing %r)" % (target, back, missing))
+        return target
+    except Exception as e:
+        log_problem("pages: the copy could not be saved", sys.exc_info())
+        return {"ok": False, "error": str(e)}
+
+
 class IngeniumApi(_LiteWindows):
     """JS API exposed to the main window as window.pywebview.api.
 
@@ -3168,6 +3245,12 @@ class IngeniumApi(_LiteWindows):
 
     def page_started(self):
         return _page_started()
+
+    def page_save(self, pid="", name="ingenium.html"):
+        return _page_save(pid, name)
+
+    def page_export(self, piece, first=False, last=False, name="ingenium.html"):
+        return _page_export(piece, first, last, name)
 
     # 6.9.2: the folder search (app_rag_692.py; rag/DESIGN.md section 6)
     def rag_choose_folder(self):
@@ -3525,6 +3608,12 @@ class IngeniumApiSingle(_LiteWindows):
 
     def page_started(self):
         return _page_started()
+
+    def page_save(self, pid="", name="ingenium.html"):
+        return _page_save(pid, name)
+
+    def page_export(self, piece, first=False, last=False, name="ingenium.html"):
+        return _page_export(piece, first, last, name)
 
     # 6.9.2: the folder search (app_rag_692.py; rag/DESIGN.md section 6)
     def rag_choose_folder(self):
