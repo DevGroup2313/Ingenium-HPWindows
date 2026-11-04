@@ -5295,6 +5295,36 @@ def _engine_choice():
             "running": _ENGINE_KIND[0] if running else None}
 
 
+
+# ---- 6.11: which engine answered, proved (app_engine3_6106.py) ----
+_engine_info_one = _engine_info
+
+
+def _engine_info():
+    """As before; the version is the running engine's own, and engine_kind says which of the two it is."""
+    info = _engine_info_one()
+    try:
+        d = _engine_dir()
+        if d and info.get("available"):
+            nd = _engine_next_dir()
+            info["engine_kind"] = "newer" if (nd and os.path.normpath(d) == os.path.normpath(nd)) else "proven"
+            v = (_engine_meta(d, "VERSION.txt") or "").strip()
+            if v:
+                info["version"] = v
+    except Exception:
+        log_problem("engine: reading the running engine's version failed", sys.exc_info())
+    return info
+
+
+def _engine_build_of(d):
+    """The engine binary's own answer to --version (its build number and commit), or a short reason."""
+    try:
+        r = subprocess.run([_engine_exe(d), "--version"], timeout=120, **_engine_popen_kw(d))
+        return (r.stdout or b"").decode("utf-8", "replace").strip()[-300:]
+    except Exception as e:
+        return "unknown (%s: %s)" % (type(e).__name__, e)
+
+
 # ---------------------------------------------------------------------------
 # R74: sharing this computer's models with the person's other devices.
 #
@@ -7174,6 +7204,9 @@ def _selftest(argv):
     try:
         info = _engine_info()
         res["engine"] = dict((k, info.get(k)) for k in ("available", "platform", "version", "threads"))
+        if info.get("available"):    # 6.11: which engine binary answers, by its own word (its build and commit)
+            res["engine"]["kind"] = info.get("engine_kind")
+            res["engine"]["build"] = _engine_build_of(_engine_dir())
         if not info.get("available"):
             raise RuntimeError("this app carries no engine")
         if model == "none":
