@@ -605,6 +605,14 @@ def _relay_stream(h):
         h.send_header("X-Upstream-Status", str(status))
         ct = resp.headers.get("Content-Type") if getattr(resp, "headers", None) else None
         h.send_header("Content-Type", ct or "application/octet-stream")
+        # 6.14 (app_mcp_614.py): an MCP server's session and protocol version travel back to the page (X-Upstream-Mcp-Session-Id)
+        try:
+            for _hn in ("Mcp-Session-Id", "MCP-Protocol-Version"):
+                _hv = resp.headers.get(_hn) if getattr(resp, "headers", None) else None
+                if _hv and "\n" not in str(_hv) and "\r" not in str(_hv):
+                    h.send_header("X-Upstream-" + _hn, str(_hv)[:200])
+        except Exception:
+            pass
         h.send_header("Cache-Control", "no-store")
         h.send_header("Connection", "close")
         h.end_headers()
