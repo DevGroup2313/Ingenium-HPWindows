@@ -8407,6 +8407,41 @@ def _quick_page(html_path):
         return None, {}
 
 
+def _ingenium_holds_port(port):
+    """True when an Ingenium answers at 127.0.0.1:port (its page, or its guard's refusal, both name it). Anything else, or no
+    answer within a second and a half, is False."""
+    try:
+        import http.client
+        c = http.client.HTTPConnection("127.0.0.1", port, timeout=1.5)
+        c.request("GET", "/", headers={"Host": "127.0.0.1:%d" % port})
+        r = c.getresponse()
+        body = r.read(200000)
+        c.close()
+        return b"Ingenium" in body or b"INGENIUM" in body
+    except Exception:
+        return False
+
+
+def _another_copy_holds_the_work(port):
+    """Her work lives at port 17953: when another Ingenium holds it, this copy would open on an empty store at another address.
+    It says so and ends instead."""
+    if port != 17953 or not _ingenium_holds_port(port):
+        return
+    log_problem("start: another Ingenium holds 127.0.0.1:17953 (her work's address); this copy ends rather than open empty")
+    tell_user(
+        "Ingenium is already open in another window, perhaps an earlier version that is still running.\n\n"
+        "Your models, conversations and settings are with the copy that opened first, so this one would open without them. "
+        "Quit the other Ingenium (in its menu bar, Ingenium, then Quit Ingenium; or right-click its icon in the Dock and choose Quit), "
+        "then open this one again: it will open on all your work.")
+    os._exit(0)
+
+
+class _IngLocalServer(socketserver.ThreadingTCPServer):
+    """The page's own server: on the Mac and Linux it takes its address again at once after a copy is quit (SO_REUSEADDR, which still
+    refuses a port another program listens on); on Windows that option would let two programs share a port, so it stays off there."""
+    allow_reuse_address = not sys.platform.startswith("win")
+
+
 def _start_local_server(directory, html_name=None):
     """Serve `directory` on 127.0.0.1, quietly, in a daemon thread. Returns the
     port, or raises. Loopback only: nothing is exposed off this machine, and
@@ -8635,10 +8670,11 @@ def _start_local_server(directory, html_name=None):
     httpd = None
     for port in list(range(17953, 17964)) + [0]:
         try:
-            box = socketserver.ThreadingTCPServer(("127.0.0.1", port), handler)
+            box = _IngLocalServer(("127.0.0.1", port), handler)
             httpd = box
             break
         except OSError:
+            _another_copy_holds_the_work(port)
             continue
     if httpd is None:
         raise RuntimeError("no loopback port was free")
