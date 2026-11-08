@@ -84,6 +84,19 @@ export function isNotFound(answer) {
   return a === NF || a === NF.replace(/\.$/, '');
 }
 
+/**
+ * True when the reply declares NOT_FOUND: it is the sentence, or the sentence is one of its sentences and it cites no passage it was
+ * given (count: how many). Her contract asks the model to "respond exactly" with NOT_FOUND when the context does not hold the answer;
+ * small models add an explanation around it (6.63, found by the evaluation). A reply that cites a passage given is an answer, and is
+ * checked as one.
+ */
+export function declaresNotFound(answer, count) {
+  if (isNotFound(answer)) return true;
+  const ss = sentences(answer);
+  if (!ss.some((x) => isNotFound(x.text))) return false;
+  return !ss.some((x) => x.cites.some((n) => n >= 1 && n <= count));
+}
+
 // [1]  [1, 3]  [1,3]  [1; 3]  [2-4]  [2–4]   (a range is expanded, at most 20 numbers); [1](link) is a Markdown link, not a citation
 const CITE = /\[(\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*)\](?!\()/g;
 
@@ -165,4 +178,4 @@ export function sourceList(passages) {
   }));
 }
 
-export default { NOT_FOUND, SYSTEM_LINES, systemPrompt, contextBlock, sourceLabel, sourcePath, ground, isNotFound, citations, sentences, checkGrounded, sourceList };
+export default { NOT_FOUND, SYSTEM_LINES, systemPrompt, contextBlock, sourceLabel, sourcePath, ground, isNotFound, declaresNotFound, citations, sentences, checkGrounded, sourceList };

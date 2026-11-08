@@ -122,7 +122,7 @@
     "onnx/model_quantized.onnx": "e9d8ebf845c413e981c175bfe49a3bfa9b3dcce2a3ba54875ee5df5a58639fbe"
    },
    "revision_seen": "a09144355adeed5f58c8ed011d209bf8ee5a1fec",
-   "shipped": "fetched by the Mac and Windows build workflows from this revision (tools/rag_reranker.sha256), not yet in rag-vendor.zip"
+   "shipped": "in rag-vendor.zip since 8 November 2026 (57db28f7...); the Mac and Windows build workflows fetch any file missing from it from this revision (tools/rag_reranker.sha256)"
   }
  ],
  "hf_list": [
