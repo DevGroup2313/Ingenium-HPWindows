@@ -22,6 +22,10 @@
 //   Phase 3 (the chat): IngRag.prompt (rag/prompt.js: NOT_FOUND, the grounding prompt, the citation reader and check) and
 //   await IngRag.openSource(passage, userId = 'me')   the file a citation names, read again through the app's bridge, with the passage
 //                                            found in it -> {status: 'exact' | 'moved' | 'changed', before, mark, after, page, ...}
+//   Phase 4 (the scheduler): IngRag.schedule(minutes, {firstMs})   every so many minutes while the app is open (0: off; her default 20),
+//                                            the folders are reconciled: only what changed is read again (rag/scheduler.js)
+//   await IngRag.reconcile(reason)           one reconcile now -> {at, folders, read, changed, gone, skipped, errors}
+//   IngRag.scheduleState()                   -> {minutes, next, running, last, ...}
 //
 // THE USER. One user now, "me": every folder added gets an ACL row for her (folder_acl), and folders() asks the store for the folders
 // she is allowed (the same SQL filter the retriever will use). The permission rules separate the app's users from one another; they
@@ -41,6 +45,7 @@ import { createEmbedder, suggestWorkers, MODEL_TIERS } from './embedder.js';
 import { createIndexer, ParseClient } from './indexer.js';
 import { retrieve as retrieveFrom } from './retriever.js';
 import * as prompt from './prompt.js';
+import { createScheduler, DEFAULT_MINUTES } from './scheduler.js';
 
 const PRINCIPAL = 'me';
 
@@ -54,6 +59,7 @@ const S = {
   listeners: new Set(),
   adding: false,
   config: { workers: null, spareGB: null, bigFolderChunks: 200, embedBatch: 32 },
+  sched: null, schedLast: null, schedRunning: false,
 };
 
 // ------------------------------------------------------------------------------------------------------ plain words for the failures
@@ -438,7 +444,71 @@ async function openSource(passage, userId, opts = {}) {
   return Object.assign(base, { start, end, before: src.slice(a, start), mark: src.slice(start, end), after: src.slice(end, b), cutBefore: a > 0, cutAfter: b < src.length });
 }
 
+// ------------------------------------------------------------------------------------------------------ the scheduler (phase 4)
+// Her task: "Reconcile each folder: compare mtime and size first, and hash the content only when they differ. Reuse stored embeddings
+// for chunks whose content_hash is unchanged. Delete chunks of removed files. Use one transaction per file", on a clock in a worker
+// (rag/scheduler.worker.js), every 20 minutes unless she chooses otherwise, only while the app is open. The reading itself is the
+// indexer's (indexer.js: size and mtime first; a changed file is read and hashed; a passage whose hash is in emb_cache is not embedded
+// again; files gone are deleted; each file is one transaction). Here, before any of that, each folder is listed and compared with the
+// index by size and modification time: a folder where nothing changed is not read at all, so a tick costs one listing per folder and
+// the reading model is not loaded for it. A folder being read is left alone; a folder marked manual only is left alone; a folder that
+// cannot be listed (its drive away) is noted and tried again at the next tick. A listing that comes back empty while the index holds
+// files is the card's question (the folder may be on a drive that is not connected), so the scheduler takes nothing out then.
+async function pendingIn(store, f) {
+  const listing = await bridge.listFiles(f.path);
+  const existing = new Map((await store.file.list({ folderId: f.id })).map((x) => [x.path, x]));
+  let changed = 0, gone = 0;
+  for (const x of listing) { const o = existing.get(x.rel); if (!o || o.size !== x.size || o.mtime !== Math.floor(x.mtime)) changed++; }
+  if (listing.length || !existing.size) { const now = new Set(listing.map((x) => x.rel)); for (const p of existing.keys()) if (!now.has(p)) gone++; }
+  return { changed, gone, listed: listing.length, indexed: existing.size, emptyNow: !listing.length && existing.size > 0 };
+}
+
+async function reconcile(reason) {
+  const report = { at: Date.now(), reason: reason || 'timer', folders: 0, read: 0, changed: 0, gone: 0, skipped: [], errors: [], summaries: [], ms: 0 };
+  if (!bridge.available()) { report.errors.push({ folderId: null, plain: PLAIN.NO_BRIDGE }); return report; }
+  S.schedRunning = true; emit({ type: 'scheduled', phase: 'start', report });
+  try {
+    const store = await openStore();
+    const list = await store.folder.list({ principalId: S.principalId });
+    for (const f of list) {
+      if (f.manualOnly) { report.skipped.push({ folderId: f.id, why: 'manual only' }); continue; }
+      if (S.jobs.has(f.id)) { report.skipped.push({ folderId: f.id, why: 'being read' }); continue; }
+      report.folders++;
+      let p;
+      try { p = await pendingIn(store, f); } catch (e) { report.errors.push({ folderId: f.id, plain: explain(e && e.code ? e : coded('FOLDER_UNAVAILABLE')).plain }); continue; }
+      if (p.emptyNow) { report.skipped.push({ folderId: f.id, why: 'empty now' }); continue; }
+      if (!p.changed && !p.gone) continue;
+      report.changed += p.changed; report.gone += p.gone; report.read++;
+      try { const sum = await indexFolder(f.id, { scheduled: true }); report.summaries.push({ folderId: f.id, files: sum.files, embedded: sum.embedded, reused: sum.reused, chunks: sum.chunks }); }
+      catch (e) { if (e && e.code !== 'ALREADY_RUNNING') report.errors.push({ folderId: f.id, plain: explain(e).plain }); }
+    }
+  } catch (e) { report.errors.push({ folderId: null, plain: explain(e).plain }); }
+  finally {
+    report.ms = Date.now() - report.at; S.schedRunning = false; S.schedLast = report;
+    emit({ type: 'scheduled', phase: 'done', report });
+  }
+  return report;
+}
+
+/** Every `minutes` minutes while the app is open (0 or less: off). opts.firstMs: a first look sooner (the card asks for one two minutes
+ *  after the app opens, so what changed while it was closed is found soon); opts.everyMs: the tests' own short interval. */
+async function schedule(minutes, opts = {}) {
+  const m = Number(minutes);
+  const every = Number.isFinite(opts.everyMs) ? opts.everyMs : (Number.isFinite(m) && m > 0 ? Math.round(m * 60000) : 0);
+  if (!every) { if (S.sched) await S.sched.stop(); return scheduleState(); }
+  if (!S.sched) S.sched = createScheduler({ onTick: () => reconcile('timer') });
+  await S.sched.start(every, { firstMs: opts.firstMs });
+  emit({ type: 'scheduled', phase: 'set' });
+  return scheduleState();
+}
+
+function scheduleState() {
+  const st = S.sched ? S.sched.state() : { everyMs: 0, minutes: 0, next: 0, running: false, ticks: 0, skipped: 0, lastError: null };
+  return Object.assign({}, st, { running: S.schedRunning, last: S.schedLast, defaultMinutes: DEFAULT_MINUTES });
+}
+
 async function shutdown() {
+  if (S.sched) { try { S.sched.terminate(); } catch (_) { /* gone */ } S.sched = null; }
   if (viewParser) { try { viewParser.terminate(); } catch (_) { /* gone */ } viewParser = null; }
   Array.from(S.jobs.keys()).forEach((id) => stopReading(id));
   await Promise.all(Array.from(S.jobs.values()).map((j) => j.done.catch(() => undefined)));
@@ -456,7 +526,7 @@ export const IngRag = {
   principal: PRINCIPAL,
   available: () => bridge.available(),
   ready, folders, addFolder, removeFolder, indexFolder, stopReading, stats, state, running, config, shutdown, suggestedWorkers, rebuild, retrieve,
-  openSource, prompt,
+  openSource, prompt, schedule, reconcile, scheduleState,
   on(fn) { S.listeners.add(fn); return () => S.listeners.delete(fn); },
   get _store() { return S.store; },
   get _embedder() { return S.embedder; },
