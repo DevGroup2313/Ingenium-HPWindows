@@ -58,7 +58,7 @@ jobs:
           echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
           echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
           # the build number: the version, the day and this repository's run number
-          echo "INGENIUM_VERSION=6.58.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERSION=6.59.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
           # Windows' own file version allows no part above 65535
           echo "INGENIUM_VERNUM=3.6.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
@@ -156,6 +156,32 @@ jobs:
             fi
           else
             echo "::warning::The speech files could not be fetched: the installed app fetches its speech model once instead"
+          fi
+
+      - name: The folder search's files (Mini's release rag-vendor, checked by SHA-256)
+        # 6.59: the installed app carries the folder search (modules/r257.js: the chat answers from her folders): this repository's
+        # rag/ (release.py writes it) and the third-party files from Mini's release rag-vendor, checked against tools/rag_vendor.sha256.
+        # The portable exe does not carry it. Not fetched, or another fingerprint: the installed app is built without it.
+        continue-on-error: true
+        run: |
+          rm -rf rag/vendor "$RUNNER_TEMP/ragv"
+          if [ ! -f rag/main.js ] || [ ! -f tools/rag_vendor.sha256 ]; then echo "::warning::No rag/ here: the app is built without the folder search"; rm -rf rag; exit 0; fi
+          WANT="$(head -n 1 tools/rag_vendor.sha256 | cut -d' ' -f1)"
+          if curl -fsSL --retry 4 --max-time 900 -o "$RUNNER_TEMP/rag-vendor.zip" "https://github.com/DevGroup2313/Ingenium-Mac-Mini/releases/download/rag-vendor/rag-vendor.zip"; then
+            GOT="$(sha256sum "$RUNNER_TEMP/rag-vendor.zip" | cut -d' ' -f1)"
+            if [ "$GOT" = "$WANT" ]; then
+              python -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$RUNNER_TEMP/rag-vendor.zip" "$RUNNER_TEMP/ragv"
+              if [ -f "$RUNNER_TEMP/ragv/sqlite/sqlite3.wasm" ] && [ -d "$RUNNER_TEMP/ragv/models/Xenova/bge-small-en-v1.5" ]; then
+                mv "$RUNNER_TEMP/ragv" rag/vendor
+                echo "* The folder search carried in the installed app: $(du -sh rag | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "::warning::The folder search's files are incomplete: the app is built without the folder search"; rm -rf rag
+              fi
+            else
+              echo "::warning::The folder search's files have the fingerprint $GOT, not $WANT: the app is built without the folder search"; rm -rf rag
+            fi
+          else
+            echo "::warning::The folder search's files could not be fetched: the app is built without the folder search"; rm -rf rag
           fi
 
       - name: Build the app (one portable file, and the folder the installer carries)
@@ -397,7 +423,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -- "$RUNNER_TEMP/setup/${APP_FILE}-Setup.exe" "${APP_FILE}-Setup.exe" \
-                 "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "${APP_FILE}-Windows-with-models.zip" \
                  "$RUNNER_TEMP/${APP_FILE}-Windows-portable.zip" "${APP_FILE}-Windows-portable.zip"
+          # 6.59: GitHub refuses a file of 2 GiB; the copy with the models goes up only below 2,140,000,000 bytes (the summary says)
+          SZ=$(stat -c%s "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip")
+          echo "* The copy with the models: $SZ bytes" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$SZ" -le 2140000000 ]; then set -- "$@" "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "${APP_FILE}-Windows-with-models.zip"
+          else echo "::warning::The copy with the models is $SZ bytes, over GitHub's limit: it is not published this time"; fi
           # R75: the Python-based package and the older name are retired
           OBSOLETE="${APP_FILE}-Windows.zip ${APP_FILE}-Windows-no-model.zip" bash tools/publish_release.sh Windows "$@"

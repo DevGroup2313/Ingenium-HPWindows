@@ -1,0 +1,120 @@
+{
+ "about": "Ingenium's folder search (rag/): the third-party files the desktop apps ship beside the page, each pinned. npm packages are checked against the registry's own sha512 integrity; Hugging Face files against the SHA-256 below (empty until the first fetch prints them). Fetched by rag/tools/fetch_vendor.py on GitHub's machines (.github/workflows/rag-vendor.yml) and by the Mac and Windows build workflows.",
+ "version": 1,
+ "npm": [
+  {
+   "name": "sqlite-vec-wasm-demo",
+   "version": "0.1.6",
+   "licence": "MIT OR Apache-2.0",
+   "integrity": "sha512-s0tpWfxmP9GfVAvFT6jdLiA4ZfWVRsS69sJpicLd+1Y8jHMagdcFWvhV8JxLK/o7T5DVywi0SSMMnAyFHmfH4g==",
+   "why": "SQLite 3.45.3 compiled with FTS5 and sqlite-vec 0.1.6 (vec0 with partition keys and metadata columns) and the OPFS file systems; the newer published builds (0.1.7 to 0.1.10-alpha.4) stop at start-up in the browser (an Emscripten 5 build mismatch: 'Attempt to set Module.postRun after it has already been processed')",
+   "files": {
+    "package/sqlite3.mjs": "sqlite/sqlite3.mjs",
+    "package/sqlite3.wasm": "sqlite/sqlite3.wasm"
+   },
+   "patches": [
+    {
+     "file": "sqlite/sqlite3.mjs",
+     "why": "Crash safety. This build's opfs-sahpool file system always tells SQLite that another connection holds a RESERVED lock, so a journal left by a crash or a forced quit is never rolled back and the index is left half-written (found in review, 1 November 2026: browser killed during a write, integrity check failing). SQLite 3.54.1 (19 October 2026) answers from the locks actually held; this patch gives the same answer for this build's single connection.",
+     "from_sha256": "4ce1919af1ca2a8e7fd34bf65647ce9eb9e7e5a715b33dfc64153dd861bca4f0",
+     "old": [
+      "      pool.log('xCheckReservedLock');",
+      "      pool.storeErr();",
+      "      wasm.poke32(pOut, 1);",
+      "      return 0;"
+     ],
+     "new": [
+      "      pool.log('xCheckReservedLock');",
+      "      pool.storeErr();",
+      "      /* Ingenium's patch (rag/vendor.json), as SQLite 3.54.1's opfs-sahpool answers: a RESERVED lock is reported only",
+      "         when a file of this pool with the same name holds one. SQLite treats a journal left by a crash as hot, and rolls",
+      "         it back, only when no RESERVED lock is held; answering 1 always left a half-written transaction in place. */",
+      "      const fThis = pool.getOFileForS3File(pFile);",
+      "      let held = 0;",
+      "      if(fThis) for(const p of __mapSqlite3File.keys()){",
+      "        if(__mapSqlite3File.get(p) !== pool) continue;",
+      "        const o = pool.getOFileForS3File(p);",
+      "        if(o && o.path === fThis.path && o.lockType > capi.SQLITE_LOCK_SHARED){ held = 1; break; }",
+      "      }",
+      "      wasm.poke32(pOut, held);",
+      "      return 0;"
+     ],
+     "sha256": "fedb0a610f41ae34b6b5545d09bf3126a49e9093eefbf6751d8b3d7df5b6cb98"
+    }
+   ]
+  },
+  {
+   "name": "@huggingface/transformers",
+   "version": "4.3.2",
+   "licence": "Apache-2.0",
+   "integrity": "sha512-V3+dqf3iWlRYJ9I9GreM3zGQd0lAXnnoPeddmkOQYWAEE4l/+Fi6p7tx/qVUJlKQgLXGim2W76rTOzz+eC0i7g==",
+   "why": "rag/embedder.worker.js imports transformers/transformers.min.js, the build with onnxruntime-web inside it. The 'web' build starts with import statements for the bare names 'onnxruntime-web/webgpu' and 'onnxruntime-common', which only a bundler resolves: a browser (and a module worker, where import maps do not work) stops with 'Failed to resolve module specifier' (checked in headless Chromium, 31 October 2026). The 'web' file is kept in the list only so that the checked tree stays as it was; nothing loads it.",
+   "files": {
+    "package/dist/transformers.web.min.js": "transformers/transformers.web.min.js",
+    "package/dist/transformers.min.js": "transformers/transformers.min.js",
+    "package/LICENSE": "transformers/LICENSE"
+   }
+  },
+  {
+   "name": "onnxruntime-web",
+   "version": "1.31.0-dev.20260914-8d85527a0",
+   "licence": "MIT",
+   "integrity": "sha512-Iy7rtadoBgxS/LLvDr3QW38DB1PNXRnr0GJMcL0TAt7c9qjgVQl83UlGCVyeAnK2InpmW8Uc3PL8XIuqtDeF6g==",
+   "why": "the version @huggingface/transformers 4.3.2 names in its dependencies",
+   "files": {
+    "package/dist/ort-wasm-simd-threaded.jsep.wasm": "ort/ort-wasm-simd-threaded.jsep.wasm",
+    "package/dist/ort-wasm-simd-threaded.jsep.mjs": "ort/ort-wasm-simd-threaded.jsep.mjs",
+    "package/dist/ort-wasm-simd-threaded.wasm": "ort/ort-wasm-simd-threaded.wasm",
+    "package/dist/ort-wasm-simd-threaded.mjs": "ort/ort-wasm-simd-threaded.mjs",
+    "package/package.json": "ort/package.json"
+   }
+  },
+  {
+   "name": "pdfjs-dist",
+   "version": "6.4.299",
+   "licence": "Apache-2.0",
+   "integrity": "sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g==",
+   "why": "the legacy build, for the oldest Mac the app supports (macOS 13.3, WebKit 16.4)",
+   "files": {
+    "package/legacy/build/pdf.min.mjs": "pdfjs/pdf.min.mjs",
+    "package/legacy/build/pdf.worker.min.mjs": "pdfjs/pdf.worker.min.mjs",
+    "package/LICENSE": "pdfjs/LICENSE"
+   }
+  },
+  {
+   "name": "mammoth",
+   "version": "1.13.0",
+   "licence": "BSD-2-Clause",
+   "integrity": "sha512-2cawcYFcP7ISfXbBcL9lmVgTNWo88v/52ND1gnywHtVT/pX0//puPnf0iMPV9ZgmuvNOE+zkIhDgZ9M2c2dDDg==",
+   "files": {
+    "package/mammoth.browser.min.js": "mammoth/mammoth.browser.min.js",
+    "package/LICENSE": "mammoth/LICENSE"
+   }
+  }
+ ],
+ "hf": [
+  {
+   "repo": "Xenova/bge-small-en-v1.5",
+   "revision": "main",
+   "role": "embedder (default): 384 dimensions, 512 tokens",
+   "dest": "models/Xenova/bge-small-en-v1.5",
+   "files": {
+    "config.json": "fa73f90bf92c8cace1fbcb709626306f2bdbc9ea3e5b5f94b440df9b6aa56350",
+    "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+    "tokenizer_config.json": "9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3",
+    "special_tokens_map.json": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+    "README.md": "ce711ead2cb11725c9c6de69779d918c500ab12c74c5c2437ff0c448ed1566a5",
+    "onnx/model_quantized.onnx": "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4"
+   },
+   "revision_seen": "ea104dacec62c0de699686887e3f920caeb4f3e3"
+  }
+ ],
+ "hf_list": [
+  "Xenova/bge-small-en-v1.5",
+  "Xenova/all-MiniLM-L6-v2",
+  "Xenova/ms-marco-MiniLM-L-6-v2",
+  "mixedbread-ai/mxbai-rerank-xsmall-v1",
+  "jinaai/jina-reranker-v1-tiny-en",
+  "Xenova/bge-reranker-base"
+ ]
+}

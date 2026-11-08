@@ -44,6 +44,10 @@ if ONEDIR:
     # 6.57: the installed app carries the speech models dictation writes with, when the build fetched them (build-windows.yml)
     if os.path.isdir(os.path.join(SPECPATH, 'speech')):
         _own.append(('speech', 'speech'))
+    # 6.59: and the folder search (rag/*.js and rag/vendor/), beside the page, when the build fetched its files (build-windows.yml);
+    # the portable exe does not carry it (84 MB more to unpack at every start): there the chat's folders are not offered
+    if os.path.isfile(os.path.join(SPECPATH, 'rag', 'main.js')) and os.path.isdir(os.path.join(SPECPATH, 'rag', 'vendor')):
+        _own.append(('rag', 'rag'))
 elif os.path.isfile(os.path.join(SPECPATH, 'engine', 'windows-x64.zip')):
     _own.append((os.path.join('engine', 'windows-x64.zip'), 'engine'))
 else:
