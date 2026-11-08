@@ -98,7 +98,8 @@ export function declaresNotFound(answer, count) {
 }
 
 // [1]  [1, 3]  [1,3]  [1; 3]  [2-4]  [2–4]   (a range is expanded, at most 20 numbers); [1](link) is a Markdown link, not a citation
-const CITE = /\[(\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*)\](?!\()/g;
+// 6.64: a bracket joined to a word or number before it (strains[7], x[2]) is an index, not a citation (the evaluation found one)
+const CITE = /(?<![\p{L}\p{N}_])\[(\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*)\](?!\()/gu;
 
 /** The citation marks of a text: [{n, start, end, raw}] in order, one entry for each number a mark names. */
 export function citations(text) {
@@ -133,7 +134,8 @@ export function sentences(text) {
     line = line.replace(/^>\s*/, '').replace(/^(?:[-*+•]|\d{1,3}[.)])\s+/, '').replace(/^\|\s*|\s*\|$/g, '');
     if (!line) continue;
     // sentence ends: . ! ? (and a closing quote or bracket) followed by a space and a capital, a digit, a quote or a mark
-    const parts = line.split(/(?<=[.!?]["'”’)]?)\s+(?=[\[A-Z0-9"'“‘(À-Þ])/);
+    // 6.64: a title or a short form (Mr. Wren, Dr. Hale, St. James, No. 7, Capt. Pryce) does not end a sentence
+    const parts = line.split(/(?<=[.!?]["'”’)]?)(?<!\b(?:Mr|Mrs|Ms|Mx|Dr|Prof|Rev|Sr|Jr|St|Capt|Col|Gen|Lt|Sgt|No|Nos|Fig|Figs|Vol|vs|cf|approx|etc|e\.g|i\.e)\.)\s+(?=[\[A-Z0-9"'“‘(À-Þ])/);
     for (let part of parts) {
       part = part.trim(); if (!part) continue;
       const lead = ONLY_CITES.exec(part) ? null : /^((?:\[\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*\]\s*)+)(.*)$/.exec(part);
