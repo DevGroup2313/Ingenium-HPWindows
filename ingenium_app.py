@@ -3439,6 +3439,14 @@ class IngeniumApi(_LiteWindows):
     def share_set(self, on):
         return _share_set(bool(on))
 
+    # 6.57 (app_cloud_657.py): this computer keeps Ingenium Cloud for her other devices (the gateway runs, the computer stays awake)
+    def cloud_box_set(self, on):
+        c = _share_cfg()
+        c["cloud"] = bool(on)
+        _share_cfg_save(c)
+        _share_apply()
+        return _share_status()
+
     def share_renew_code(self):
         return _share_renew_code()
 
@@ -3796,6 +3804,14 @@ class IngeniumApiSingle(_LiteWindows):
 
     def share_set(self, on):
         return _share_set(bool(on))
+
+    # 6.57 (app_cloud_657.py): this computer keeps Ingenium Cloud for her other devices (the gateway runs, the computer stays awake)
+    def cloud_box_set(self, on):
+        c = _share_cfg()
+        c["cloud"] = bool(on)
+        _share_cfg_save(c)
+        _share_apply()
+        return _share_status()
 
     def share_renew_code(self):
         return _share_renew_code()
@@ -6025,6 +6041,184 @@ def _share_wait_ready(mid, timeout=1200):
     raise RuntimeError("the model was still loading after 20 minutes")
 
 
+# ---------------------------------------------------------------------------
+# 6.57 (app_cloud_657.py): Ingenium Cloud's box. The page seals every part before it leaves the device; this computer keeps sealed
+# parts it cannot read, and each device's latest snapshots, on the gateway that lends models, behind its pairing code.
+# ---------------------------------------------------------------------------
+_CLOUD_API = 1
+_CLOUD_LOCK = threading.Lock()
+_CLOUD_PART_MAX = 24 << 20
+_CLOUD_KEEP = 5
+_CLOUD_ID = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _cloud_box_dir():
+    d = _models_dir()
+    if d is None:
+        return None
+    c = d.parent / "cloud"
+    try:
+        (c / "parts").mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return None
+    return c
+
+
+def _cloud_index(c):
+    try:
+        idx = json.loads((c / "snaps.json").read_text("utf-8"))
+        if isinstance(idx, dict) and isinstance(idx.get("snaps"), list):
+            return idx
+    except Exception:
+        pass
+    return {"v": 1, "snaps": []}
+
+
+def _cloud_index_save(c, idx):
+    tmp = c / "snaps.json.tmp"
+    tmp.write_text(json.dumps(idx), "utf-8")
+    os.replace(str(tmp), str(c / "snaps.json"))
+
+
+def _cloud_part_path(c, pid):
+    return c / "parts" / pid[:2] / pid
+
+
+def _cloud_census(c):
+    n, b = 0, 0
+    try:
+        for sub in (c / "parts").iterdir():
+            if sub.is_dir():
+                for f in sub.iterdir():
+                    n += 1
+                    b += f.stat().st_size
+    except Exception:
+        pass
+    return n, b
+
+
+def _cloud_gc(c, idx):
+    """parts that no kept snapshot names, and that came more than an hour ago (one arriving now is not taken from under it)"""
+    keep = set()
+    for sn in idx.get("snaps", []):
+        keep.add(sn.get("head"))
+        keep.update(sn.get("parts") or [])
+    now = time.time()
+    try:
+        for sub in (c / "parts").iterdir():
+            if not sub.is_dir():
+                continue
+            for f in sub.iterdir():
+                if f.name not in keep and now - f.stat().st_mtime > 3600:
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+
+def _cloud_body(h, limit):
+    n = int(h.headers.get("Content-Length") or 0)
+    if n <= 0 or n > limit:
+        raise ValueError("size")
+    return json.loads(h.rfile.read(n).decode("utf-8") or "{}")
+
+
+def _cloud_get(h, path):
+    c = _cloud_box_dir()
+    if c is None:
+        return h._err(500, "This computer has no folder for Ingenium Cloud.")
+    if path == "/ingenium/cloud":
+        with _CLOUD_LOCK:
+            idx = _cloud_index(c)
+            n, b = _cloud_census(c)
+        return h._json(200, {"ok": True, "api": _CLOUD_API, "computer": _share_computer_name(), "snaps": idx["snaps"], "parts": n, "bytes": b})
+    if path.startswith("/ingenium/cloud/part/"):
+        pid = path.rsplit("/", 1)[-1]
+        if not _CLOUD_ID.match(pid):
+            return h._err(400, "That is not the name of a part.")
+        f = _cloud_part_path(c, pid)
+        if not f.exists():
+            return h._err(404, "This computer does not keep that part.")
+        data = f.read_bytes()
+        return h._json(200, {"id": pid, "b64": base64.b64encode(data).decode("ascii"), "sha": hashlib.sha256(data).hexdigest()})
+    return h._err(404, "not found")
+
+
+def _cloud_post(h, path):
+    c = _cloud_box_dir()
+    if c is None:
+        return h._err(500, "This computer has no folder for Ingenium Cloud.")
+    try:
+        body = _cloud_body(h, _CLOUD_PART_MAX * 4 // 3 + 65536)
+        if not isinstance(body, dict):
+            raise ValueError("shape")
+    except Exception:
+        return h._err(400, "The request was not readable.")
+    if path == "/ingenium/cloud/has":
+        ids = [i for i in (body.get("ids") or []) if isinstance(i, str) and _CLOUD_ID.match(i)][:50000]
+        return h._json(200, {"missing": [i for i in ids if not _cloud_part_path(c, i).exists()]})
+    if path.startswith("/ingenium/cloud/part/"):
+        pid = path.rsplit("/", 1)[-1]
+        if not _CLOUD_ID.match(pid):
+            return h._err(400, "That is not the name of a part.")
+        try:
+            raw = base64.b64decode(str(body.get("b64") or ""), validate=True)
+        except Exception:
+            return h._err(400, "The part was not readable.")
+        if not raw or len(raw) > _CLOUD_PART_MAX:
+            return h._err(413, "That part is larger than the Cloud keeps.")
+        if hashlib.sha256(raw).hexdigest() != str(body.get("sha") or ""):
+            return h._err(400, "The part arrived damaged. Send it again.")
+        f = _cloud_part_path(c, pid)
+        with _CLOUD_LOCK:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            if not f.exists():
+                tmp = f.with_name(f.name + ".tmp")
+                tmp.write_bytes(raw)
+                os.replace(str(tmp), str(f))
+            else:
+                os.utime(str(f), None)
+        return h._json(200, {"ok": True})
+    if path == "/ingenium/cloud/snap":
+        dev = str(body.get("device") or "")[:64]
+        head = str(body.get("head") or "")
+        parts = body.get("parts") or []
+        if not re.match(r"^[A-Za-z0-9_-]{6,64}$", dev) or not _CLOUD_ID.match(head) or not isinstance(parts, list) or len(parts) > 200000:
+            return h._err(400, "That snapshot is not complete.")
+        parts = [str(x) for x in parts]
+        if any(not _CLOUD_ID.match(x) for x in parts):
+            return h._err(400, "That snapshot names a part wrongly.")
+        missing = [x for x in [head] + parts if not _cloud_part_path(c, x).exists()]
+        if missing:
+            return h._json(409, {"error": {"message": "Some parts have not arrived yet.", "code": 409}, "missing": missing[:2000]})
+        snap = {"device": dev, "name": str(body.get("name") or "")[:120], "at": int(body.get("at") or 0), "head": head, "parts": parts,
+                "bytes": int(body.get("bytes") or 0), "platform": str(body.get("platform") or "")[:60], "version": str(body.get("version") or "")[:20],
+                "got": int(time.time() * 1000)}
+        # how the page draws its key from her passphrase (a salt and a count of rounds: neither is secret), so a device joining
+        # the Cloud draws the same key; a snapshot without it keeps the one its device sent before
+        kdf = body.get("kdf")
+        if isinstance(kdf, dict) and re.match(r"^[A-Za-z0-9+/=]{16,64}$", str(kdf.get("salt") or "")) and 100000 <= int(kdf.get("iter") or 0) <= 10000000:
+            snap["kdf"] = {"salt": str(kdf["salt"]), "iter": int(kdf["iter"]), "name": "PBKDF2-SHA-256"}
+        with _CLOUD_LOCK:
+            idx = _cloud_index(c)
+            mine = [x for x in idx["snaps"] if x.get("device") == dev] + [snap]
+            mine.sort(key=lambda x: x.get("got") or 0)
+            idx["snaps"] = [x for x in idx["snaps"] if x.get("device") != dev] + mine[-_CLOUD_KEEP:]
+            _cloud_index_save(c, idx)
+            _cloud_gc(c, idx)
+        return h._json(200, {"ok": True, "got": snap["got"]})
+    if path == "/ingenium/cloud/forget":
+        dev = str(body.get("device") or "")[:64]
+        with _CLOUD_LOCK:
+            idx = _cloud_index(c)
+            idx["snaps"] = [x for x in idx["snaps"] if x.get("device") != dev]
+            _cloud_index_save(c, idx)
+        return h._json(200, {"ok": True})
+    return h._err(404, "not found")
+
+
 def _share_handler():
     class H(http.server.BaseHTTPRequestHandler):
         server_version = "Ingenium"
@@ -6084,9 +6278,13 @@ def _share_handler():
             if path == "/ingenium/hello":
                 lend = bool(_SHARE.get("lend"))
                 return self._json(200, {"app": "Ingenium", "name": APP_NAME, "computer": _share_computer_name(), "needs_code": True,
-                                        "lends": lend, "models": len(_share_models()) if lend else 0, "callins": True, "api": _LEND_API})
+                                        "lends": lend, "models": len(_share_models()) if lend else 0, "callins": True, "api": _LEND_API,
+                                        "cloud": _CLOUD_API})
             if not self._allowed():
                 return
+            # 6.57: Ingenium Cloud's box (app_cloud_657.py), whether or not this computer lends its models
+            if path == "/ingenium/cloud" or path.startswith("/ingenium/cloud/"):
+                return _cloud_get(self, path)
             if path == "/ingenium/callins":
                 return self._json(200, {"callins": _callin_list()})
             if path.startswith("/ingenium/via/"):
@@ -6105,6 +6303,9 @@ def _share_handler():
             path = self.path.split("?", 1)[0].rstrip("/")
             if not self._allowed():
                 return
+            # 6.57: Ingenium Cloud's box (app_cloud_657.py)
+            if path.startswith("/ingenium/cloud/"):
+                return _cloud_post(self, path)
             # R97: a computer that this one cannot reach calls in, and carries its models over that call
             if path == "/ingenium/callin":
                 return _callin_poll(self)
@@ -7055,7 +7256,7 @@ def _share_status():
     running = port is not None
     cfg = _share_cfg()
     lend = running and bool(cfg.get("on"))
-    return {"ok": True, "on": lend, "running": running, "callins_on": bool(cfg.get("callins")), "port": port,
+    return {"ok": True, "on": lend, "running": running, "callins_on": bool(cfg.get("callins")), "port": port, "cloud_on": bool(cfg.get("cloud")),
             "code": _share_code(), "addresses": _share_addresses(port) if running else [],
             "computer": _share_computer_name(), "busy": busy, "error": err,
             "recent": [{"address": ip, "minutes_ago": int((now - t) // 60)} for t, ip in recent[:6]],
@@ -7077,12 +7278,13 @@ def _share_apply():
     lets the person's other computers call it (to lend it theirs)."""
     c = _share_cfg()
     _SHARE["lend"] = bool(c.get("on"))
-    if c.get("on") or c.get("callins"):
+    # 6.57 (app_cloud_657.py): and while it keeps the Cloud for her other devices
+    if c.get("on") or c.get("callins") or c.get("cloud"):
         _share_start()
     else:
         _share_stop()
-    # only lending keeps the computer awake; a laptop that borrows sleeps as it likes
-    _share_keep_awake(bool(c.get("on")) and _SHARE["server"] is not None)
+    # only lending, or keeping the Cloud, keeps the computer awake; a laptop that borrows sleeps as it likes
+    _share_keep_awake((bool(c.get("on")) or bool(c.get("cloud"))) and _SHARE["server"] is not None)
     _callout_apply()
 
 
