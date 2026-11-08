@@ -107,6 +107,22 @@
     "onnx/model_quantized.onnx": "6c9c6101a956d62dfb5e7190c538226c0c5bb9cb27b651234b6df063ee7dbfe4"
    },
    "revision_seen": "ea104dacec62c0de699686887e3f920caeb4f3e3"
+  },
+  {
+   "repo": "Xenova/ms-marco-MiniLM-L-6-v2",
+   "revision": "a09144355adeed5f58c8ed011d209bf8ee5a1fec",
+   "role": "reranker (optional, off by default, loaded on demand; phase 5): a cross-encoder that reads the question and a passage together. Confirmed on Hugging Face on 8 November 2026: tagged transformers.js, onnx and text-classification; a conversion of cross-encoder/ms-marco-MiniLM-L6-v2 (Apache-2.0)",
+   "dest": "models/Xenova/ms-marco-MiniLM-L-6-v2",
+   "files": {
+    "config.json": "d827779a72d27ae68cf878a6fc2e954542663fe21ca515d9f4783fc96be2d37e",
+    "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
+    "tokenizer_config.json": "0b29c7bfc889e53b36d9dd3e686dd4300f6525110eaa98c76a5dafceb2029f53",
+    "vocab.txt": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+    "quantize_config.json": "70258803fcd13ac45765fe3a814e191d3541b1313301fee2dee760214656ba66",
+    "onnx/model_quantized.onnx": "e9d8ebf845c413e981c175bfe49a3bfa9b3dcce2a3ba54875ee5df5a58639fbe"
+   },
+   "revision_seen": "a09144355adeed5f58c8ed011d209bf8ee5a1fec",
+   "shipped": "fetched by the Mac and Windows build workflows from this revision (tools/rag_reranker.sha256), not yet in rag-vendor.zip"
   }
  ],
  "hf_list": [

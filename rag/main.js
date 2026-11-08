@@ -46,6 +46,7 @@ import { createIndexer, ParseClient } from './indexer.js';
 import { retrieve as retrieveFrom } from './retriever.js';
 import * as prompt from './prompt.js';
 import { createScheduler, DEFAULT_MINUTES } from './scheduler.js';
+import { createReranker } from './reranker.js';
 
 const PRINCIPAL = 'me';
 
@@ -58,7 +59,8 @@ const S = {
   lastRun: new Map(),                              // folderId -> {at, summary | error}
   listeners: new Set(),
   adding: false,
-  config: { workers: null, spareGB: null, bigFolderChunks: 200, embedBatch: 32 },
+  config: { workers: null, spareGB: null, bigFolderChunks: 200, embedBatch: 32, rerank: false },
+  reranker: null, rerankReady: null,
   sched: null, schedLast: null, schedRunning: false,
 };
 
@@ -80,6 +82,7 @@ const PLAIN = {
   NOT_CHOSEN: 'Ingenium no longer has this folder on its list. Remove it here, then add it again.',
   NOT_ALLOWED: 'This passage is in a folder that cannot be opened for you.',
   CHANGED: 'The file changed while it was being opened. Try again.',
+  RERANK_MISSING: "The reranker's model is not in this copy of the app, so the passages keep the search's own order.",
   CORRUPT: "The folder search's memory was damaged, perhaps because Ingenium was closed while it was saving. It can start again from nothing: your files are not touched, and your folders are read again.",
 };
 const FATAL_STATUS = { OPFS_LOCKED: 'locked', OPFS_UNAVAILABLE: 'unavailable', SCHEMA_TOO_NEW: 'failed', WORKER_FAILED: 'failed', DIMS_MISMATCH: 'failed', CORRUPT: 'damaged' };
@@ -404,7 +407,21 @@ async function rebuild() {
 // model when they are not open yet. The chat calls it for every turn while "Your folders" is on in its + menu (phase 3, r257.js).
 async function retrieve(query, userId, opts) {
   await ready();
-  return retrieveFrom({ store: S.store, embedder: S.embedder }, query, userId == null ? PRINCIPAL : userId, opts || {});
+  const o = Object.assign({}, opts || {});
+  if (o.rerank == null) o.rerank = !!S.config.rerank;
+  let reranker = null, rerankNote = null;
+  if (o.rerank) { try { reranker = await rerankerReady(); } catch (e) { o.rerank = false; rerankNote = e.code === 'MODEL_NOT_INSTALLED' ? PLAIN.RERANK_MISSING : (e.plain || String(e.message || e)); } }
+  const r = await retrieveFrom({ store: S.store, embedder: S.embedder, reranker }, query, userId == null ? PRINCIPAL : userId, o);
+  if (rerankNote) r.rerankNote = rerankNote;
+  return r;
+}
+// phase 5: the optional reranker, loaded the first time a retrieval asks for it (her task: "off by default, loaded on demand")
+function rerankerReady() {
+  if (S.rerankReady) return S.rerankReady;
+  const rr = createReranker();
+  const p = rr.init().then(() => { S.reranker = rr; return rr; }, (e) => { try { rr.terminate(); } catch (_) { /* gone */ } S.rerankReady = null; throw explain(e); });
+  S.rerankReady = p;
+  return p;
 }
 
 // ------------------------------------------------------------------------------------------------------ the source of a citation (phase 3)
@@ -508,6 +525,7 @@ function scheduleState() {
 }
 
 async function shutdown() {
+  if (S.reranker) { try { S.reranker.terminate(); } catch (_) { /* gone */ } S.reranker = null; S.rerankReady = null; }
   if (S.sched) { try { S.sched.terminate(); } catch (_) { /* gone */ } S.sched = null; }
   if (viewParser) { try { viewParser.terminate(); } catch (_) { /* gone */ } viewParser = null; }
   Array.from(S.jobs.keys()).forEach((id) => stopReading(id));
@@ -532,6 +550,7 @@ export const IngRag = {
   get _embedder() { return S.embedder; },
   get _indexer() { return S.indexer; },
   get _principalId() { return S.principalId; },
+  get _reranker() { return S.reranker; },
 };
 
 if (typeof window !== 'undefined') window.IngRag = IngRag;

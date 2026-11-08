@@ -25,6 +25,7 @@ export const RRF_K = 60;
 export const PER_LIST = 20;
 export const TOP = 5;
 export const MAX_QUESTION = 4000;   // characters of a question kept (the reading model reads at most 512 tokens of it anyway)
+export const RERANK_FROM = 20;      // phase 5, her task: "merge with reciprocal rank fusion (k = 60), then rerank to 5 if enabled, else take the top 5"
 
 /** Reciprocal Rank Fusion of lists of ids, each best first. -> [{id, score, bestRank, ranks: [rank or null per list]}], best first. */
 export function rrf(lists, k = RRF_K) {
@@ -50,7 +51,8 @@ function argError(message) { const e = new Error(message); e.code = 'BAD_ARGS'; 
 
 /**
  * The passages of the folders `userId` may read that answer `query` best.
- * opts: {k = TOP, perList = PER_LIST, rrfK = RRF_K, folderIds (narrows the user's folders)}.
+ * opts: {k = TOP, perList = PER_LIST, rrfK = RRF_K, folderIds (narrows the user's folders), rerank (ctx.reranker reorders the best
+ * rerankFrom = RERANK_FROM fused passages by reading the question and each passage together, and the best k are kept)}.
  * -> {passages, principalId, match (the text search's MATCH, or null), fts: [hits], vec: [hits], ms}
  */
 export async function retrieve(ctx, query, userId, opts = {}) {
@@ -78,14 +80,22 @@ export async function retrieve(ctx, query, userId, opts = {}) {
     vecHits = (await store.search.vec(Object.assign({ embedding: qv }, args))).hits;
   } catch (e) { ftsP.catch(() => undefined); throw e; }
   const fts = await ftsP;
-  const fused = rrf([fts.hits.map((h) => h.id), vecHits.map((h) => h.id)], k).slice(0, top);
-  const rows = fused.length ? await store.chunk.get({ ids: fused.map((f) => f.id), principalId: who.id }) : [];
+  const rerank = !!(opts.rerank && ctx.reranker);
+  const pool = rrf([fts.hits.map((h) => h.id), vecHits.map((h) => h.id)], k).slice(0, rerank ? Math.max(top, opts.rerankFrom || RERANK_FROM) : top);
+  const rows = pool.length ? await store.chunk.get({ ids: pool.map((f) => f.id), principalId: who.id }) : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
   const dist = new Map(vecHits.map((h) => [h.id, h.distance]));
-  const passages = fused.filter((f) => byId.has(f.id)).map((f) => Object.assign({}, byId.get(f.id), {
-    score: f.score, ftsRank: f.ranks[0], vecRank: f.ranks[1], distance: dist.has(f.id) ? dist.get(f.id) : null }));
+  let passages = pool.filter((f) => byId.has(f.id)).map((f, i) => Object.assign({}, byId.get(f.id), {
+    score: f.score, ftsRank: f.ranks[0], vecRank: f.ranks[1], distance: dist.has(f.id) ? dist.get(f.id) : null, fusedRank: i + 1 }));
+  // the reranker reads the question and each passage together; it only reorders passages the user may read (the folder rule ran above)
+  if (rerank && passages.length) {
+    const scores = await ctx.reranker.score({ query: q, texts: passages.map((p) => (p.headingPath ? p.headingPath + '\n\n' : '') + p.text) });
+    passages.forEach((p, i) => { p.rerankScore = scores[i]; });
+    passages = passages.slice().sort((a, b) => b.rerankScore - a.rerankScore || a.fusedRank - b.fusedRank);
+  }
+  passages = passages.slice(0, top);
   const ms = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-  return { passages, principalId: who.id, match: fts.match, fts: fts.hits, vec: vecHits, ms };
+  return { passages, principalId: who.id, match: fts.match, fts: fts.hits, vec: vecHits, reranked: rerank, ms };
 }
 
 export default retrieve;
