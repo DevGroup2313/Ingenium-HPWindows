@@ -222,6 +222,22 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Output "::error::the installer could not be made"; exit 1 }
           $setup = Get-Item (Join-Path $out "$env:APP_FILE-Setup.exe")
           Write-Output ("Made {0}: {1:N1} MB" -f $setup.Name, ($setup.Length / 1MB))
+          # 6.60: a second installer for the copy with the models, without the speech models and the folder search: with them that copy
+          # is 2,205,231,457 bytes (6.59), over GitHub's limit of 2 GiB for one file. There dictation fetches its model once and the
+          # folder search is not offered; Ingenium-Setup.exe, the main download, carries both.
+          $lite = Join-Path $env:RUNNER_TEMP "lite\$env:APP_FILE"
+          if (Test-Path $lite) { Remove-Item -Recurse -Force $lite }
+          New-Item -ItemType Directory -Force (Split-Path $lite) | Out-Null
+          Copy-Item -Recurse (Join-Path $PWD "dist\$env:APP_FILE") $lite
+          Get-ChildItem $lite -Directory -Recurse -Depth 1 | Where-Object { ($_.Name -eq 'speech' -and (Test-Path (Join-Path $_.FullName 'speech.json'))) -or ($_.Name -eq 'rag' -and (Test-Path (Join-Path $_.FullName 'main.js'))) } | ForEach-Object { Write-Output "left out of the copy with the models: $($_.FullName)"; Remove-Item -Recurse -Force $_.FullName }
+          $outLite = Join-Path $env:RUNNER_TEMP 'setup-lite'
+          & $iscc /Qp "/DAppName=$env:APP_NAME" "/DAppFile=$env:APP_FILE" "/DAppIdent=$env:APP_ID" `
+            "/DAppVersion=$env:INGENIUM_VERSION" "/DVerNum=$env:INGENIUM_VERNUM" "/DRepoDir=$PWD" `
+            "/DSrcDir=$lite" "/DEngineDir=$(Join-Path $env:RUNNER_TEMP 'engine\windows-x64')" `
+            "/DOutDir=$outLite" installer\Ingenium.iss
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error::the installer for the copy with the models could not be made"; exit 1 }
+          $sl = Get-Item (Join-Path $outLite "$env:APP_FILE-Setup.exe")
+          Write-Output ("Made the installer for the copy with the models: {0:N1} MB" -f ($sl.Length / 1MB))
 
       - name: Install it as on a laptop that had the Python version, and test the installed app
         shell: pwsh
@@ -414,6 +430,8 @@ jobs:
 
       - name: Zip the copy with the models, and the portable exe
         run: |
+          # 6.60: the copy with the models takes the installer without the speech models and the folder search (made beside the main one)
+          if [ -f "$RUNNER_TEMP/setup-lite/${APP_FILE}-Setup.exe" ]; then cp -f "$RUNNER_TEMP/setup-lite/${APP_FILE}-Setup.exe" "$RUNNER_TEMP/full/$APP_FILE/${APP_FILE}-Setup.exe"; fi
           cd "$RUNNER_TEMP/full" && 7z a -tzip -mx=1 "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "$APP_FILE" > /dev/null
           mkdir -p "$RUNNER_TEMP/portable/$APP_FILE"
           cp "$GITHUB_WORKSPACE/dist/$APP_FILE.exe" "$RUNNER_TEMP/portable/$APP_FILE/"
