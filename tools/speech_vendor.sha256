@@ -1,0 +1,3 @@
+2ec77edee6dc91446b3106bc4d8a03555fb36874e4e5650a91c0e1cb9a72e9cc  speech-vendor.zip
+# 6.57: the speech engine and models dictation writes with (modules/r254.js), from Mini's release speech-vendor
+# (.github/workflows/speech-vendor.yml); the build carries them beside the page only when the file it fetches has this fingerprint.

@@ -41,6 +41,9 @@ for _f in ('app.json', 'THIRD_PARTY_NOTICES.txt', 'LICENCE.txt'):
 # engine inside the page.
 if ONEDIR:
     print('ingenium: folder build; the installer places the engine beside the program')
+    # 6.57: the installed app carries the speech models dictation writes with, when the build fetched them (build-windows.yml)
+    if os.path.isdir(os.path.join(SPECPATH, 'speech')):
+        _own.append(('speech', 'speech'))
 elif os.path.isfile(os.path.join(SPECPATH, 'engine', 'windows-x64.zip')):
     _own.append((os.path.join('engine', 'windows-x64.zip'), 'engine'))
 else:

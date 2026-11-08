@@ -139,6 +139,25 @@ jobs:
           sys.exit(0 if ok else 1)
           EOF
 
+      - name: The speech models dictation writes with (Mini's release speech-vendor, checked by SHA-256)
+        # 6.57: her choice, "Carry them": the installed app carries them, so dictation works offline from the first launch. The
+        # portable exe does not (it unpacks itself at every start, and 162 MB more would slow each one); it fetches the model once.
+        continue-on-error: true
+        run: |
+          WANT="$(head -n 1 tools/speech_vendor.sha256 | cut -d' ' -f1)"
+          rm -rf speech
+          if curl -fsSL --retry 4 --max-time 900 -o "$RUNNER_TEMP/speech.zip" "https://github.com/DevGroup2313/Ingenium-Mac-Mini/releases/download/speech-vendor/speech-vendor.zip"; then
+            GOT="$(sha256sum "$RUNNER_TEMP/speech.zip" | cut -d' ' -f1)"
+            if [ "$GOT" = "$WANT" ]; then
+              python -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$RUNNER_TEMP/speech.zip" speech
+              echo "* Speech models carried for dictation in the installed app: $(du -sh speech | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::The speech files' fingerprint is $GOT, not $WANT: the installed app fetches its speech model once instead"
+            fi
+          else
+            echo "::warning::The speech files could not be fetched: the installed app fetches its speech model once instead"
+          fi
+
       - name: Build the app (one portable file, and the folder the installer carries)
         run: |
           python tools/stamp_build.py ingenium.html "$INGENIUM_VERSION"
