@@ -31,6 +31,24 @@ try:
 except Exception:
     _cfg = {}
 APP_FILE = re.sub(r'[^A-Za-z0-9._-]', '', str(_cfg.get('file_name') or '')) or 'Ingenium'
+# 6.70: the program carries its own name. Her words (10 November 2026): "I want the "exe" to be removed from the app's name when I
+# build it inside of Ingenium." Without a version resource Windows names a program by its file, "Name.exe" (Task Manager, the
+# taskbar, notifications, Open with); its FileDescription and ProductName are now the app's own name (app.json "name").
+# PyInstaller's EXE takes a VSVersionInfo for version= (PyInstaller/building/api.py, 6.22.3).
+APP_NAME = str(_cfg.get('name') or '').strip() or APP_FILE
+APP_VERSION = str(_cfg.get('version') or os.environ.get('INGENIUM_VERSION') or '1.0').strip()
+_vn = ([min(65535, int(x)) for x in re.findall(r'\d+', APP_VERSION)][:2] + [0, 0, 0, 0])[:4]
+try:
+    from PyInstaller.utils.win32 import versioninfo as _vi
+    VERSION_INFO = _vi.VSVersionInfo(
+        ffi=_vi.FixedFileInfo(filevers=tuple(_vn), prodvers=tuple(_vn)),
+        kids=[_vi.StringFileInfo([_vi.StringTable('040904B0', [
+                  _vi.StringStruct('FileDescription', APP_NAME), _vi.StringStruct('ProductName', APP_NAME),
+                  _vi.StringStruct('FileVersion', APP_VERSION), _vi.StringStruct('ProductVersion', APP_VERSION),
+                  _vi.StringStruct('InternalName', APP_FILE), _vi.StringStruct('OriginalFilename', APP_FILE + '.exe')])]),
+              _vi.VarFileInfo([_vi.VarStruct('Translation', [1033, 1200])])])
+except Exception:
+    VERSION_INFO = None
 ONEDIR = os.environ.get('INGENIUM_ONEDIR') == '1'
 _own = [('ingenium.html', '.'), ('ingenium.ico', '.'), ('ingenium.png', '.')]
 for _f in ('app.json', 'THIRD_PARTY_NOTICES.txt', 'LICENCE.txt'):
@@ -151,6 +169,7 @@ if ONEDIR:
         console=False,
         disable_windowed_traceback=False,
         icon='ingenium.ico',
+        version=VERSION_INFO,
     )
     coll = COLLECT(
         exe,
@@ -176,4 +195,5 @@ else:
     console=False,
     disable_windowed_traceback=False,
     icon='ingenium.ico',
+    version=VERSION_INFO,
 )
