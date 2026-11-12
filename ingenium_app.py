@@ -10159,7 +10159,8 @@ def _disk_text(b):
 
 def _disk_refs(repo):
     refs, head = {}, None
-    for k, v in repo.refs.as_dict().items():
+    # 6.91: sorted, so every start of the app gives the same order (app_refs_691.py)
+    for k, v in sorted(repo.refs.as_dict().items()):
         name = _disk_text(k)
         if not v or not (name.startswith("refs/heads/") or name.startswith("refs/tags/") or name.startswith("refs/pull/")):
             continue
