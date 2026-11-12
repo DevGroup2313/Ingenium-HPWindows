@@ -103,6 +103,8 @@ a = Analysis(
         'webview.platforms.winforms',
         # 6.83: Fabrica brings everything from GitHub with git's own protocol (dulwich, a git written in Python; app_hub_683.py)
         'dulwich', 'dulwich.client', 'dulwich.repo', 'dulwich.objects', 'dulwich.pack', 'dulwich.protocol', 'urllib3',
+        # 6.86: Fabrica reads every repository on this computer from the drive (app_disk_686.py)
+        'dulwich.object_store', 'dulwich.index',
         'webview.platforms.edgechromium',
         # R78: the clipboard for the edit panel's Paste and Copy (ingenium_app._win_clipboard_*)
         'ctypes',
