@@ -132,7 +132,7 @@ if "!TOOLS_OK!"=="1" (
     rem (plain Python, installed in seconds); the rest must come ready-made
     call :runlive "'%VPY%' -m pip install --disable-pip-version-check proxy_tools"
     if errorlevel 1 goto tools_failed
-    call :runlive "'%VPY%' -m pip install --disable-pip-version-check --only-binary=:all: "pythonnet>=3.0.3" "pywebview>=5" "pyinstaller>=6" certifi"
+    call :runlive "'%VPY%' -m pip install --disable-pip-version-check --only-binary=:all: "pythonnet>=3.0.3" "pywebview>=5" "pyinstaller>=6" certifi dulwich==0.22.8"
     if errorlevel 1 goto tools_failed
   )
 )
@@ -184,7 +184,7 @@ if exist dist rmdir /s /q dist
 rem R77: this build's own number (the version, the day and the time it was
 rem built), shown in About, as the cloud builds show theirs
 set "BUILD_NO="
-for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=6.82.%%B"
+for /f "usebackq delims=" %%B in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd.HHmm"`) do set "BUILD_NO=6.83.%%B"
 if defined BUILD_NO (
   call :runlive "'%VPY%' tools\stamp_build.py ingenium.html !BUILD_NO!"
   call :say "Build number: !BUILD_NO!"

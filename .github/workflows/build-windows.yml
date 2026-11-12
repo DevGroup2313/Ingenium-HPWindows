@@ -58,7 +58,7 @@ jobs:
           echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
           echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
           # the build number: the version, the day and this repository's run number
-          echo "INGENIUM_VERSION=6.82.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERSION=6.83.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
           # Windows' own file version allows no part above 65535
           echo "INGENIUM_VERNUM=3.6.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
@@ -120,7 +120,7 @@ jobs:
           key: model-${{ hashFiles('desktop_model.json') }}
 
       - name: Install the build tools
-        run: python -m pip install --disable-pip-version-check pyinstaller==6.22.3 pywebview==6.2.1 pythonnet==3.2.0 certifi
+        run: python -m pip install --disable-pip-version-check pyinstaller==6.22.3 pywebview==6.2.1 pythonnet==3.2.0 certifi dulwich==0.22.8
 
       - name: The edit panel's clipboard (R78), copied and pasted through the app's own code
         continue-on-error: true
@@ -324,7 +324,7 @@ jobs:
           try { Invoke-WebRequest -Uri "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-DSpark-GGUF/resolve/main/LFM2.5-1.2B-Instruct-DSpark-Q4_K_M.gguf" -OutFile $spd -MaximumRetryCount 4 -RetryIntervalSec 5
                 if ((Get-FileHash $spd -Algorithm SHA256).Hash.ToLower() -ne "5cf9bb2947638dd74a47b486b817f407831c0da420aeebb6973fb66c25af51e4") { Remove-Item $spd } } catch { Write-Output "speed-up file not fetched: $_" }
           if (Test-Path $spd) { $arg += @('--selftest-drafter', $spd) }
-          $arg += @('--selftest-share')
+          $arg += @('--selftest-share', '--selftest-hub')
           $p = Start-Process -FilePath $exe -ArgumentList $arg -WorkingDirectory $inst -Wait -PassThru
           $r = Get-Content $res -Raw | ConvertFrom-Json
           $t = $r.timings

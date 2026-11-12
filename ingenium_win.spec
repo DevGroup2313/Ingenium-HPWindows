@@ -101,6 +101,8 @@ a = Analysis(
     # Left out, the app builds cleanly and then cannot draw a window.
     hiddenimports=[
         'webview.platforms.winforms',
+        # 6.83: Fabrica brings everything from GitHub with git's own protocol (dulwich, a git written in Python; app_hub_683.py)
+        'dulwich', 'dulwich.client', 'dulwich.repo', 'dulwich.objects', 'dulwich.pack', 'dulwich.protocol', 'urllib3',
         'webview.platforms.edgechromium',
         # R78: the clipboard for the edit panel's Paste and Copy (ingenium_app._win_clipboard_*)
         'ctypes',
