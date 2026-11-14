@@ -46,9 +46,9 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0, runs on Node.js 24
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0, runs on Node.js 24
         with:
           python-version: '3.12'
 
@@ -72,7 +72,7 @@ jobs:
       # files, and kept in the build cache so it is compiled once.
       - name: The trainer, from the build cache when it was compiled before
         id: trainer
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5.1.0, runs on Node.js 24
         with:
           path: engine-trainer/windows-x64
           key: trainer-windows-x64-b11321-v1
@@ -114,7 +114,7 @@ jobs:
           exit ${PIPESTATUS[0]}
 
       - name: The built-in models, from the build cache when they were downloaded before
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5.1.0, runs on Node.js 24
         with:
           path: ~/.cache/ingenium-models
           key: model-${{ hashFiles('desktop_model.json') }}

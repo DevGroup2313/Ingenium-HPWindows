@@ -31,7 +31,7 @@ jobs:
         shell: pwsh
     steps:
       - name: Get the project
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0, runs on Node.js 24
 
       - name: Find the project folder
         run: |
@@ -41,7 +41,7 @@ jobs:
           "Project folder: $($f.DirectoryName)"
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0, runs on Node.js 24
         with:
           python-version: '3.12'
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Keep the screenshot with this run
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0, runs on Node.js 24
         with:
           name: windows-screenshot
           path: ${{ runner.temp }}/shots
@@ -173,7 +173,7 @@ jobs:
           "Uninstalled cleanly; the work folder is untouched."
 
       - name: Keep the installer with this run
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0, runs on Node.js 24
         with:
           name: carpe-diem-windows-setup
           path: out/${{ env.SETUP_NAME }}
@@ -185,7 +185,7 @@ jobs:
           Get-Item "$env:GITHUB_WORKSPACE\Carpe-Diem-Windows.zip" | Format-List Name, Length
 
       - name: Keep the app with this run
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0, runs on Node.js 24
         with:
           name: carpe-diem-windows
           path: Carpe-Diem-Windows.zip
