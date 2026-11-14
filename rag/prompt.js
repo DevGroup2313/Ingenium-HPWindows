@@ -184,9 +184,11 @@ export function checkGrounded(answer, count) {
 // What it cannot see: a claim that puts true details in a false relation ("from Wren to Grieve" for a letter from Grieve to Wren).
 //   details(text)                     -> {nums, cal, codes, names, words}: what the sentence states exactly
 //   supports(passage, text)           -> {ok, missing}: does this passage hold the sentence's details, together where they must be?
-//   guard(answer, passages)           -> {text, notFound, ok, kept, repaired, removed}: the reply with every sentence cited by a passage
+//   guard(answer, passages, question) -> {text, notFound, ok, kept, repaired, removed}: the reply with every sentence cited by a passage
 //                                        that holds its details; a missing or wrong citation is mended when one passage holds them all;
-//                                        a sentence no passage supports is taken out (and listed); nothing left gives NOT_FOUND
+//                                        a sentence no passage supports is taken out (and listed); nothing left gives NOT_FOUND. What the
+//                                        question states is given (a sentence may repeat its dates and names), and a passage is its label
+//                                        (folder, file, heading, page) and its text, as the model read it
 const NUMWORDS = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
   thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
   sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100 };
@@ -231,7 +233,8 @@ export function details(text) {
     const clean = w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
     if (!clean || !/^\p{Lu}/u.test(clean) || clean.length < 2) return;
     const prev = i ? toks[i - 1] : '';
-    if (i === 0 || /[.!?:;]["'”’)]?$/.test(prev)) return;            // the first word of a sentence or clause
+    const title = /^(?:Mr|Mrs|Ms|Mx|Dr|Prof|Rev|Sr|Jr|St|Capt|Col|Gen|Lt|Sgt|Messrs|Sir|Lady|Lord|Dame)\.?$/i.test(prev.replace(/^[^\p{L}]+/u, ''));
+    if (i === 0 || (!title && /[.!?:;]["'”’)]?$/.test(prev))) return;   // the first word of a sentence or clause (a title such as Mr. ends none)
     const lw = clean.toLowerCase();
     if (NAME_SKIP.has(lw) || MONTHS.includes(lw) || DAYS.includes(lw) || MON[lw]) return;
     if (/^\p{Lu}+$/u.test(clean) && clean.length > 5) return;       // a shouted word, not a name
@@ -258,7 +261,10 @@ function units(text) {
 /** Does this passage hold the sentence's details? -> {ok, missing: [what it lacks], share: how much of the sentence's wording it has} */
 export function supports(passage, text, det) {
   const d = det || details(text);
-  const ptext = str(passage && passage.text != null ? passage.text : passage);
+  // the passage as the model was given it: its label (folder, file path, heading, page) and its text (7.07: a wages roll's year and
+  // ship are often in its file name, wages_roll_hester_1788.csv, not in its rows)
+  const label = passage && typeof passage === 'object' ? sourceLabel(passage).replace(/[_/#.()>-]+/g, ' ') : '';
+  const ptext = (label ? label + '\n' : '') + str(passage && passage.text != null ? passage.text : passage);
   const P = plain(ptext), pw = new Set(wordsOf(P)), pn = new Set(numsOf(P)), praw = ptext.toLowerCase();
   const missing = [];
   for (const c of d.codes) if (!praw.includes(c)) missing.push(c);
@@ -287,8 +293,11 @@ const SPLIT = /(?<=[.!?]["'”’)]?)(?<!\b(?:Mr|Mrs|Ms|Mx|Dr|Prof|Rev|Sr|Jr|St|
  * A sentence that introduces what follows (it ends with a colon) is kept as it is; so are code blocks and headings. A sentence that
  * only points at a passage ("This is stated in [1].") is kept when its passage is one given, and it is not counted as a claim.
  */
-export function guard(answer, passages) {
+export function guard(answer, passages, question) {
   const ps = Array.isArray(passages) ? passages : [];
+  // 7.07: what the question itself states (its dates, names, numbers) is given, not claimed: a sentence may repeat it
+  const qd = details(str(question));
+  const given = (d) => ({ nums: d.nums.filter((x) => !qd.nums.includes(x)), cal: d.cal.filter((x) => !qd.cal.includes(x)), codes: d.codes.filter((x) => !qd.codes.includes(x)), names: d.names.filter((x) => !qd.names.includes(x)), words: d.words });
   const count = ps.length;
   if (!count || declaresNotFound(answer, count)) return { text: NOT_FOUND, notFound: true, ok: true, kept: 0, repaired: [], removed: [] };
   const repaired = [], removed = [];
@@ -298,19 +307,28 @@ export function guard(answer, passages) {
     if (!/[\p{L}\p{N}]/u.test(body)) return sent;
     if (/:\s*$/.test(body)) return sent;                                  // it introduces what follows
     const cites = citations(sent).map((c) => c.n).filter((n) => n >= 1 && n <= count);
-    const d = details(body);
+    const d0 = details(body), d = given(d0);
     const exact = d.codes.length + d.names.length + d.nums.length + d.cal.length;
+    // a sentence whose every exact detail is the question's own ("This decision was made on 18 June 2026 [1].") claims nothing new:
+    // kept when it cites a passage given
+    if (!exact && d0.codes.length + d0.names.length + d0.nums.length + d0.cal.length && cites.length) { kept++; return sent; }
     if (META.test(body) && !exact) { if (cites.length) return sent; removed.push({ text: sent.trim(), missing: ['names no passage'] }); return ''; }
+    // 7.08: a sentence with no detail and almost no words of its own ("It is also in [9].") is no claim: kept when it cites a passage
+    // given, else taken out; never mended to a passage it did not name
+    if (!exact && d.words.length < 2 && !(d0.codes.length + d0.names.length + d0.nums.length + d0.cal.length)) { if (cites.length) return sent; removed.push({ text: sent.trim(), missing: ['names no passage'] }); return ''; }
     if (cites.length && cites.some((n) => supports(ps[n - 1], body, d).ok)) { kept++; return sent; }
     // the passage that holds every detail, and most of the wording, mends the citation
     let best = 0, bestShare = -1;
     ps.forEach((p, i) => { const s = supports(p, body, d); if (s.ok && s.share > bestShare) { best = i + 1; bestShare = s.share; } });
     if (best && (exact || bestShare >= 0.6)) {
-      const stripped = sent.replace(/\s*\[(\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*)\](?!\()/g, '');
-      const m = /^(.*?)([.!?]["'”’)]?)?\s*$/s.exec(stripped);
       repaired.push({ text: sent.trim(), from: cites, to: best });
       kept++;
-      return m[1] + ' [' + best + ']' + (m[2] || '');
+      if (citations(sent).length) {   // renumbered where it stands, so "as stated in [2]" stays a sentence
+        let first = true;
+        return sent.replace(/(\s*)\[(\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*)\](?!\()/g, (all, sp) => { if (!first) return ''; first = false; return sp + '[' + best + ']'; });
+      }
+      const m = /^(.*?)([.!?]["'”’)]?)?\s*$/s.exec(sent);
+      return m[1].replace(/\s+$/, '') + ' [' + best + ']' + (m[2] || '');
     }
     const why = cites.length ? supports(ps[cites[0] - 1], body, d).missing : ['no citation, and no passage holds it'];
     removed.push({ text: sent.trim(), missing: why });
