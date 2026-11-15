@@ -12384,17 +12384,38 @@ def _runs_rec_path(rid):
     return os.path.join(_runs_dir(), _runs_safe(rid), "run.json")
 
 
+# 7.11 (app_runs_710.py): a run's record is read and written one at a time in this app, and a step that meets PermissionError (on
+# Windows, a file held open elsewhere cannot be replaced) tries again for up to two seconds; before, a read during a write could end a
+# job at once, its later steps left "queued", and a good run could end bad at random
+_runs_io = threading.Lock()
+
+
+def _runs_retry(fn):
+    t_end = time.time() + 2.0
+    while True:
+        try:
+            return fn()
+        except PermissionError:
+            if time.time() > t_end:
+                raise
+            time.sleep(0.025)
+
+
 def _runs_read(rid):
-    with open(_runs_rec_path(rid), encoding="utf-8") as fh:
-        return json.load(fh)
+    def go():
+        with open(_runs_rec_path(rid), encoding="utf-8") as fh:
+            return json.load(fh)
+    with _runs_io:
+        return _runs_retry(go)
 
 
 def _runs_write(rec):
     f = _runs_rec_path(rec["id"])
     tmp = f + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(rec, fh, ensure_ascii=False, indent=1)
-    os.replace(tmp, f)
+    with _runs_io:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(rec, fh, ensure_ascii=False, indent=1)
+        _runs_retry(lambda: os.replace(tmp, f))
 
 
 def _runs_new(spec):
