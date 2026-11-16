@@ -13155,11 +13155,29 @@ def _runs_ps(cmd, timeout=60):
     return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
 
 
+def _runs_install_setup(x, info):
+    """7.24 (app_setup_724.py): the app's own installer, "<App> Setup.exe", put in a folder of its own in %TEMP% and opened; it asks
+    for everyone on this PC or just for you itself"""
+    import tempfile
+    name = os.path.basename(x["file"])
+    if not name.lower().endswith(".exe"):
+        name = (re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", str(info.get("title") or "")).strip(" .") or "App") + " Setup.exe"
+    home = os.path.join(tempfile.gettempdir(), "Ingenium setups", hashlib.sha1(os.urandom(8)).hexdigest()[:8])
+    os.makedirs(home, exist_ok=True)
+    target = os.path.join(home, name)
+    shutil.copy2(x["file"], target)
+    os.startfile(target)
+    return {"ok": True, "setup": True, "path": target, "where": "its installer, which asks for everyone on this PC or just for you"}
+
+
 def _runs_install_win(x, info):
     """a Windows app Fabrica made (a zip holding Name.exe), installed for the person alone, with no administrator password: the program in
     %LOCALAPPDATA%\\Programs\\Name, a shortcut in the Start menu and one on the desktop, and an entry in Settings, Apps (HKCU) whose
     Uninstall takes it all away again (uninstall.cmd beside the program). Its work, kept by the app under its own id, stays."""
     import winreg
+    with open(x["file"], "rb") as fh:
+        if fh.read(2) == b"MZ":
+            return _runs_install_setup(x, info)
     out = os.path.join(x["dir"], "out")
     os.makedirs(out, exist_ok=True)
     _runs_unzip(x["file"], out)
