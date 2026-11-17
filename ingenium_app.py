@@ -3622,6 +3622,18 @@ class IngeniumApi(_LiteWindows):
         _share_apply()
         return _share_status()
 
+    def share_runs_set(self, on):
+        return _share_runs_set(bool(on))
+
+    def runs_keep_copy(self, rec, machine=None):
+        return _runs_keep_copy(rec, machine)
+
+    def runs_keep_log(self, rid, job, text, append=False):
+        return _runs_keep_log(rid, job, text, append)
+
+    def runs_keep_file(self, rid, art, path, b64, append=False):
+        return _runs_keep_file(rid, art, path, b64, append)
+
     def share_renew_code(self):
         return _share_renew_code()
 
@@ -4166,6 +4178,18 @@ class IngeniumApiSingle(_LiteWindows):
         _share_cfg_save(c)
         _share_apply()
         return _share_status()
+
+    def share_runs_set(self, on):
+        return _share_runs_set(bool(on))
+
+    def runs_keep_copy(self, rec, machine=None):
+        return _runs_keep_copy(rec, machine)
+
+    def runs_keep_log(self, rid, job, text, append=False):
+        return _runs_keep_log(rid, job, text, append)
+
+    def runs_keep_file(self, rid, art, path, b64, append=False):
+        return _runs_keep_file(rid, art, path, b64, append)
 
     def share_renew_code(self):
         return _share_renew_code()
@@ -6861,7 +6885,7 @@ def _share_handler():
                 lend = bool(_SHARE.get("lend"))
                 return self._json(200, {"app": "Ingenium", "name": APP_NAME, "computer": _share_computer_name(), "needs_code": True,
                                         "lends": lend, "models": len(_share_models()) if lend else 0, "callins": True, "api": _LEND_API,
-                                        "cloud": _CLOUD_API, "id": _share_id(), "kind": _share_kind(), "pair": 1,
+                                        "cloud": _CLOUD_API, "runs": 1 if _share_cfg().get("runs") else 0, "id": _share_id(), "kind": _share_kind(), "pair": 1,
                                         "addresses": _share_addresses_cached(self.server.server_address[1])})
             if not self._allowed():
                 return
@@ -6872,6 +6896,9 @@ def _share_handler():
                 return self._json(200, {"callins": _callin_list()})
             if path.startswith("/ingenium/via/"):
                 return _callin_via_get(self, path)
+            # 7.28 (app_runs_728.py): Fabrica's runs for her devices
+            if path.startswith("/ingenium/runs/"):
+                return _runs_dev_get(self, path)
             if not _SHARE.get("lend"):
                 return self._err(403, "This computer is not lending its models. Switch sharing on there, in Settings, Your models on every device.")
             if path in ("/v1/models", "/models"):
@@ -6892,6 +6919,9 @@ def _share_handler():
             # 6.57: Ingenium Cloud's box (app_cloud_657.py)
             if path.startswith("/ingenium/cloud/"):
                 return _cloud_post(self, path)
+            # 7.28 (app_runs_728.py): Fabrica's runs for her devices
+            if path.startswith("/ingenium/runs/"):
+                return _runs_dev_post(self, path)
             # R97: a computer that this one cannot reach calls in, and carries its models over that call
             if path == "/ingenium/callin":
                 return _callin_poll(self)
@@ -8016,7 +8046,7 @@ def _share_status():
     running = port is not None
     cfg = _share_cfg()
     lend = running and bool(cfg.get("on"))
-    return {"ok": True, "on": lend, "running": running, "callins_on": bool(cfg.get("callins")), "port": port, "cloud_on": bool(cfg.get("cloud")),
+    return {"ok": True, "on": lend, "running": running, "callins_on": bool(cfg.get("callins")), "port": port, "cloud_on": bool(cfg.get("cloud")), "runs_on": bool(cfg.get("runs")),
             "code": _share_code(), "addresses": _share_addresses(port) if running else [],
             "computer": _share_computer_name(), "busy": busy, "error": err,
             "recent": [{"address": ip, "minutes_ago": int((now - t) // 60)} for t, ip in recent[:6]],
@@ -8041,7 +8071,7 @@ def _share_apply():
     c = _share_cfg()
     _SHARE["lend"] = bool(c.get("on"))
     # 6.57 (app_cloud_657.py): and while it keeps the Cloud for her other devices
-    if c.get("on") or c.get("callins") or c.get("cloud"):
+    if c.get("on") or c.get("callins") or c.get("cloud") or c.get("runs"):   # 7.28: or runs for her devices
         _share_start()
     else:
         _share_stop()
@@ -12462,6 +12492,166 @@ def _runs_new(spec):
         return {"ok": True, "id": rid, "src": os.path.join(d, "src")}
 
 
+# ---- 7.28 (Fabrica): runs for her other devices on this computer, and the copy kept on the one that sent them (app_runs_728.py) ----
+_RUNS_DEV_MAX = 64 << 20
+_RUNS_DEV_OFF = ("Fabrica's runs for your devices are off on this computer. Turn them on there: Settings, Your devices, "
+                 "Run Fabrica's jobs for my devices.")
+
+
+def _runs_dev_on():
+    return bool(_share_cfg().get("runs"))
+
+
+def _runs_dev_who(h):
+    dev = _share_dev_header(h.headers.get("X-Ingenium-Device"))
+    if not dev:
+        h._err(401, "Pair this device with this computer first: type the code it shows, in Settings, Your devices.")
+        return None
+    return dev
+
+
+def _runs_dev_mine(rid, dev):
+    try:
+        r = _runs_read(_runs_safe(rid))
+    except Exception:
+        return False
+    return (r.get("by") or {}).get("id") == dev["id"]
+
+
+def _runs_dev_q(h):
+    from urllib.parse import parse_qs
+    q = parse_qs(h.path.split("?", 1)[1] if "?" in h.path else "")
+    return lambda k, d="": (q.get(k) or [d])[0]
+
+
+def _runs_dev_get(h, path):
+    if not _runs_dev_on():
+        return h._err(403, _RUNS_DEV_OFF)
+    dev = _runs_dev_who(h)
+    if not dev:
+        return
+    g = _runs_dev_q(h)
+    try:
+        if path == "/ingenium/runs/tools":
+            return h._json(200, _runs_tools(g("fresh") == "1"))
+        if path == "/ingenium/runs/list":
+            r = _runs_list()
+            r["runs"] = [x for x in r.get("runs") or [] if (x.get("by") or {}).get("id") == dev["id"]]
+            return h._json(200, r)
+        rid = g("rid")
+        if not _runs_dev_mine(rid, dev):
+            return h._err(404, "No run sent by this device has that name here.")
+        if path == "/ingenium/runs/get":
+            return h._json(200, _runs_get(rid))
+        if path == "/ingenium/runs/log":
+            return h._json(200, _runs_log(rid, g("job"), int(g("offset") or 0)))
+        if path == "/ingenium/runs/file":
+            return h._json(200, _runs_file(rid, g("art"), g("path"), int(g("offset") or 0), int(g("size") or 4194304)))
+    except Exception as e:
+        return h._err(500, str(e))
+    return h._err(404, "not found")
+
+
+def _runs_dev_post(h, path):
+    if not _runs_dev_on():
+        return h._err(403, _RUNS_DEV_OFF)
+    dev = _runs_dev_who(h)
+    if not dev:
+        return
+    try:
+        n = int(h.headers.get("Content-Length") or 0)
+        if n > _RUNS_DEV_MAX:
+            return h._err(413, "Too large: a part is sent in pieces of a few megabytes.")
+        body = json.loads(h.rfile.read(n).decode("utf-8") or "{}")
+        if not isinstance(body, dict):
+            raise ValueError("not an object")
+    except Exception:
+        return h._err(400, "the request was not readable")
+    try:
+        if path == "/ingenium/runs/new":
+            spec = body.get("spec") if isinstance(body.get("spec"), dict) else {}
+            spec["disk"] = ""    # never from this computer's own drive: the device sends the app's files
+            spec["why"] = ("from %s, " % (dev.get("name") or "another device")) + str(spec.get("why") or "")
+            r = _runs_new(spec)
+            if r.get("ok"):
+                rec = _runs_read(r["id"])
+                rec["by"] = {"id": dev["id"], "name": dev.get("name") or "", "kind": dev.get("kind") or ""}
+                _runs_write(rec)
+                r.pop("src", None)   # this computer's own folders stay its own
+            return h._json(200, r)
+        rid = str(body.get("rid") or "")
+        if not _runs_dev_mine(rid, dev):
+            return h._err(404, "No run sent by this device has that name here.")
+        if path == "/ingenium/runs/put":
+            return h._json(200, _runs_put(rid, body.get("path"), body.get("b64") or "", body.get("mode"), bool(body.get("append"))))
+        if path == "/ingenium/runs/go":
+            return h._json(200, _runs_go(rid))
+        if path == "/ingenium/runs/stop":
+            return h._json(200, _runs_stop(rid))
+        if path == "/ingenium/runs/forget":
+            return h._json(200, _runs_forget(rid))
+    except Exception as e:
+        return h._err(500, str(e))
+    return h._err(404, "not found")
+
+
+def _share_runs_set(on):
+    c = _share_cfg()
+    c["runs"] = bool(on)
+    _share_cfg_save(c)
+    _share_apply()
+    return _share_status()
+
+
+def _runs_keep_copy(rec, machine=None):
+    """a run made on another of her computers, kept here too, with where it ran"""
+    if not isinstance(rec, dict) or not rec.get("id"):
+        return {"ok": False, "error": "no run to keep"}
+    m = machine if isinstance(machine, dict) else {}
+    rid = _runs_safe(str(rec["id"]))
+    d = os.path.join(_runs_dir(), rid)
+    f = os.path.join(d, "run.json")
+    if os.path.isfile(f):
+        try:
+            old = _runs_read(rid)
+        except Exception:
+            old = {}
+        if not old.get("remote"):
+            rid = rid + "-k"     # a run of this computer's own already has that name
+            d = os.path.join(_runs_dir(), rid)
+    for sub in ("logs", "files"):
+        os.makedirs(os.path.join(d, sub), exist_ok=True)
+    keep = dict(rec)
+    keep["id"] = rid
+    keep["remote"] = {"computer": str(m.get("name") or "")[:80], "id": str(m.get("id") or "")[:80], "kind": str(m.get("kind") or "")[:20],
+                      "rid": str(rec["id"])[:80], "kept": time.time()}
+    _runs_write(keep)
+    return {"ok": True, "id": rid}
+
+
+def _runs_keep_log(rid, job, text, append=False):
+    try:
+        f = os.path.join(_runs_dir(), _runs_safe(rid), "logs", _runs_safe(job, 60) + ".log")
+        with open(f, "ab" if append else "wb") as fh:
+            fh.write(str(text or "").encode("utf-8"))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _runs_keep_file(rid, art, path, b64, append=False):
+    try:
+        base = os.path.join(_runs_dir(), _runs_safe(rid), "files", _runs_safe(art, 120))
+        os.makedirs(base, exist_ok=True)
+        to = _runs_inside(base, path)
+        os.makedirs(os.path.dirname(to), exist_ok=True)
+        with open(to, "ab" if append else "wb") as fh:
+            fh.write(base64.b64decode(b64 or ""))
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def _runs_inside(base, rel):
     rel = str(rel or "").replace("\\", "/")
     if not rel or rel.startswith("/") or any(part in ("..", "") for part in rel.split("/")) or re.match(r"^[A-Za-z]:", rel):
@@ -12971,7 +13161,7 @@ def _runs_list():
                 continue
             if r.get("state") == "running" and n not in _RUNS["live"]:
                 r["state"] = "stopped"   # the app closed while it ran
-            row = {k: r.get(k) for k in ("id", "at", "state", "app", "repo", "version", "label", "workflow", "file", "why", "machine", "ended", "started", "n", "event")}
+            row = {k: r.get(k) for k in ("id", "at", "state", "app", "repo", "version", "label", "workflow", "file", "why", "machine", "ended", "started", "n", "event", "by", "remote")}
             row["jobs"] = [{"key": j["key"], "name": j["name"], "state": j["state"], "started": j.get("started"), "ended": j.get("ended")} for j in r.get("jobs") or []]
             row["files"] = sum(len(a.get("files") or []) for a in r.get("artifacts") or [])
             out.append(row)
