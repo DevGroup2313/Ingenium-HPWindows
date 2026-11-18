@@ -245,9 +245,25 @@ def storage_dir():
         return None
 
 
-def crash_log_path():
-    """Beside the program if that is writable, otherwise the home folder."""
+def _mac_logs_dir():
+    """7.39 (app_logs_739.py): a built app on a Mac keeps its logs in ~/Library/Logs/Ingenium, never inside itself (its signature)"""
     import os
+    if sys.platform != "darwin" or not getattr(sys, "frozen", False):
+        return None
+    d = os.path.join(os.path.expanduser("~"), "Library", "Logs", "Ingenium")
+    try:
+        os.makedirs(d, exist_ok=True)
+        return d
+    except Exception:
+        return None
+
+
+def crash_log_path():
+    """Beside the program if that is writable, otherwise the home folder; on a Mac, ~/Library/Logs/Ingenium (7.39)."""
+    import os
+    mac = _mac_logs_dir()
+    if mac:
+        return os.path.join(mac, "ingenium_crash.log")
     try:
         base = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
         probe = os.path.join(base, ".ingenium_write_test")
@@ -7479,6 +7495,50 @@ def _ollama_chats_json(offset=0, length=4 << 20):
             shutil.rmtree(d, ignore_errors=True)
 
 
+# ---- 7.39: the speech files beside the page, for her paired devices (app_speech_739.py) ----
+def _speech_dir():
+    try:
+        page = find_app_html()
+        d = os.path.join(os.path.dirname(page), "speech") if page else None
+        return d if d and os.path.isfile(os.path.join(d, "speech.json")) else None
+    except Exception:
+        return None
+
+
+def _speech_dev_get(h, path):
+    from urllib.parse import urlparse, parse_qs
+    d = _speech_dir()
+    if path == "/ingenium/speech":
+        if not d:
+            return h._json(200, {"have": False})
+        with open(os.path.join(d, "speech.json"), encoding="utf-8") as fh:
+            j = json.load(fh)
+        j["have"] = True
+        return h._json(200, j)
+    if path == "/ingenium/speech/part":
+        if not d:
+            return h._err(404, "This computer carries no speech files.")
+        q = parse_qs(urlparse(h.path).query)
+        rel = (q.get("f") or [""])[0].replace("\\", "/")
+        if not rel or rel.startswith("/") or ".." in rel.split("/") or not (rel.startswith("runtime/") or rel.startswith("models/")):
+            return h._err(400, "not a speech file")
+        f = os.path.realpath(os.path.join(d, rel))
+        if not f.startswith(os.path.realpath(d) + os.sep) or not os.path.isfile(f):
+            return h._err(404, "not here")
+        try:
+            off = max(0, int((q.get("off") or ["0"])[0]))
+            ln = max(1, min(int((q.get("len") or [str(4 << 20)])[0]), 8 << 20))
+        except Exception:
+            return h._err(400, "not readable")
+        size = os.path.getsize(f)
+        with open(f, "rb") as fh:
+            fh.seek(off)
+            data = fh.read(ln)
+        return h._json(200, {"ok": True, "size": size, "off": off, "length": len(data), "more": off + len(data) < size,
+                             "b64": base64.b64encode(data).decode("ascii")})
+    return h._err(404, "not found")
+
+
 def _share_handler():
     class H(http.server.BaseHTTPRequestHandler):
         server_version = "Ingenium"
@@ -7558,13 +7618,16 @@ def _share_handler():
                 lend = bool(_SHARE.get("lend"))
                 return self._json(200, {"app": "Ingenium", "name": APP_NAME, "computer": _share_computer_name(), "needs_code": True,
                                         "lends": lend, "models": len(_share_models()) if lend else 0, "callins": True, "api": _LEND_API,
-                                        "cloud": _CLOUD_API, "runs": 1 if _share_cfg().get("runs") else 0, "apps": 1, "id": _share_id(), "kind": _share_kind(), "pair": 1, "seal": 1 if _seal_lib() else 0,
+                                        "cloud": _CLOUD_API, "runs": 1 if _share_cfg().get("runs") else 0, "apps": 1, "id": _share_id(), "kind": _share_kind(), "pair": 1, "seal": 1 if _seal_lib() else 0, "speech": 1 if _speech_dir() else 0,
                                         "addresses": _share_addresses_cached(self.server.server_address[1])})
             if not self._allowed():
                 return
             # 7.37 (app_seal_737.py): a device waits for her to compare the words on this computer
             if path == "/ingenium/pair2/state":
                 return _seal_pair_state(self)
+            # 7.39 (app_speech_739.py): the speech files, for a device that has none
+            if path == "/ingenium/speech" or path.startswith("/ingenium/speech/"):
+                return _speech_dev_get(self, path)
             # 6.57: Ingenium Cloud's box (app_cloud_657.py), whether or not this computer lends its models
             if path == "/ingenium/cloud" or path.startswith("/ingenium/cloud/"):
                 return _cloud_get(self, path)
