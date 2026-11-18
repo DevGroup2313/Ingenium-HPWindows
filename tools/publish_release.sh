@@ -29,7 +29,8 @@ if [ -n "$HAVE" ] && [ -n "${INGENIUM_VERSION:-}" ] && [ "$HAVE" != "${INGENIUM_
 fi
 
 git tag -f "$TAG" "$GITHUB_SHA"
-if ! git push -f origin "refs/tags/$TAG"; then
+pushed=0; for i in 1 2 3; do if git push -f origin "refs/tags/$TAG"; then pushed=1; break; fi; sleep $((i * 10)); done   # 7.40: tried again
+if [ "$pushed" != 1 ]; then
   echo "(the tag could not be moved, so the release stays where it is; the files are still replaced)"
   git tag -d "$TAG" > /dev/null 2>&1 || true
 fi
@@ -87,4 +88,12 @@ ALL="$( (gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null 
   echo
   echo "The app runs its models on this computer with no connection. Each build was tested before it was published: the app's own engine answered a question with the built-in model."
 } > "$NOTES_FILE"
-gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE" --latest
+# 7.40: GitHub's network can drop for a moment (7.39's Intel job: "Could not resolve host: github.com", then an i/o timeout on this
+# last call, after both files were uploaded). Tried again with a pause; if it still fails, the files are published and only the notes
+# wait for the next build, so the build is not marked failed for it.
+ok=0
+for i in 1 2 3 4; do
+  if gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE" --latest; then ok=1; break; fi
+  echo "the release notes could not be written (attempt $i); trying again"; sleep $((i * 15))
+done
+[ "$ok" = 1 ] || echo "::warning::The files are published, but the release notes could not be updated (GitHub did not answer). The next build writes them."
