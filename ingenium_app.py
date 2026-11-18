@@ -9296,6 +9296,70 @@ def _selftest_speedup(b, dpath):
     return out
 
 
+# ---- 7.38: the self-test pairs sealed, as her devices do (app_seal2_738.py) ----
+_SELFTEST_DEV = "id=selftest-device;kind=laptop;name=Self-test"
+
+
+def _seal_selftest(base, code, plain_models):
+    """pair sealed with this computer's own gateway, as a phone would, and ask for the model list through /ingenium/sealed"""
+    import secrets
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    dev_id = "selftest-sealed"
+    hdr = "id=%s;kind=phone;name=Self-test%%20phone" % dev_id
+    me = ec.generate_private_key(ec.SECP256R1())
+    pub = me.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+
+    def call(path, body=None, headers=None):
+        h = {"content-type": "application/json", "X-Ingenium-Device": hdr}
+        h.update(headers or {})
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        return _NO_PROXY.open(urllib.request.Request("http://%s%s" % (base, path), data=data, headers=h), timeout=120)
+    with call("/ingenium/pair2", {"id": dev_id, "kind": "phone", "name": "Self-test phone", "pub": base64.b64encode(pub).decode("ascii")},
+              {"authorization": "Bearer " + code}) as r:
+        ask = json.loads(r.read().decode("utf-8"))
+    peer = base64.b64decode(ask["pub"])
+    if ask.get("words") != _seal_words(pub, peer):
+        return {"ok": False, "error": "the four words differ between the two sides"}
+    ans = _seal_answer(ask["rid"], True)            # here she would press They match
+    if not ans.get("ok"):
+        return {"ok": False, "error": "the pairing was not confirmed: %s" % ans.get("error")}
+    with call("/ingenium/pair2/state?rid=" + ask["rid"], None, {"authorization": "Bearer " + code}) as r:
+        st = json.loads(r.read().decode("utf-8"))
+    if st.get("state") != "ok" or not st.get("sealed"):
+        return {"ok": False, "error": "the pairing did not end sealed: %s" % st}
+    shared = me.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), peer))
+    x, y = sorted([pub, peer])
+    key = HKDF(algorithm=hashes.SHA256(), length=32, salt=hashlib.sha256(b"ingenium-seal-v1" + x + y).digest(), info=b"messages").derive(shared)
+    aes, rid, iv = AESGCM(key), secrets.token_hex(8), os.urandom(12)
+    inner = {"m": "GET", "p": "/v1/models", "h": {"X-Ingenium-Device": hdr}, "b": "", "t": int(time.time() * 1000), "r": rid}
+    ct = aes.encrypt(iv, json.dumps(inner).encode("utf-8"), ("ingenium-seal-v1|req|%s" % dev_id).encode("utf-8"))
+    with call("/ingenium/sealed", {"v": 1, "d": dev_id, "i": base64.b64encode(iv).decode("ascii"), "c": base64.b64encode(ct).decode("ascii")}) as r:
+        lines = [l for l in r.read().split(b"\n") if l.strip()]
+    ad, raw, ended = ("ingenium-seal-v1|res|%s|%s|" % (dev_id, rid)).encode("utf-8"), b"", False
+    for n, l in enumerate(lines):
+        u = base64.b64decode(l)
+        pt = aes.decrypt(u[:12], u[12:], ad + str(n).encode("ascii"))
+        if pt[:1] == b"\x01":
+            ended = True
+            break
+        raw += pt[1:]
+    head, _, body = raw.partition(b"\r\n\r\n")
+    status = int(head.split(b" ", 2)[1]) if head.startswith(b"HTTP/") else 0
+    models = [m.get("name") for m in (json.loads(body.decode("utf-8")).get("data") or [])] if status == 200 else []
+    refused = False
+    try:      # the sealed device, with the code alone, is refused
+        call("/v1/models", None, {"authorization": "Bearer " + code}).close()
+    except urllib.error.HTTPError as e:
+        refused = e.code == 401
+    _seal_forget(dev_id)
+    ok = ended and status == 200 and models == plain_models and refused
+    return {"ok": ok, "frames": len(lines), "status": status, "models": models, "refuses_code_alone": refused,
+            "error": "" if ok else "the sealed answer was not the plain one (status %s, ended %s, refused %s)" % (status, ended, refused)}
+
+
 def _selftest_share(b):
     """R74: the gateway that lends this computer's models: reached at its home
     network address, it must refuse a wrong pairing code, list the models,
@@ -9307,10 +9371,14 @@ def _selftest_share(b):
             out["error"] = _SHARE["error"] or "the gateway could not start"
             return out
         port, code = _SHARE["port"], _share_code()
+        if _seal_lib():      # 7.38 (app_seal2_738.py): the self-test is a device paired before 7.37, as far as the code goes
+            _st = _seal_store()
+            if "selftest-device" not in _st["legacy"]:
+                _st["legacy"].append("selftest-device")
         ips = [a for a in _share_addresses(port) if re.match(r"\d+\.\d+\.\d+\.\d+:", a)]
 
         def call(base, path, body=None, key=None):
-            h = {"content-type": "application/json"}
+            h = {"content-type": "application/json", "X-Ingenium-Device": _SELFTEST_DEV}   # 7.38: a device paired before 7.37
             if key:
                 h["authorization"] = "Bearer " + key
             data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -9337,6 +9405,18 @@ def _selftest_share(b):
         with call(base, "/v1/models", key=code.lower()) as r:
             models = json.loads(r.read().decode("utf-8")).get("data") or []
         out["models"] = [m.get("name") for m in models]
+        if _seal_lib():      # 7.38 (app_seal2_738.py): and sealed, as her devices pair
+            try:
+                out["sealed"] = _seal_selftest(base, code, out["models"])
+            except Exception as e:
+                out["sealed"] = {"ok": False, "error": "%s: %s" % (type(e).__name__, e)}
+            if not out["sealed"].get("ok"):
+                out["error"] = "sealed between devices: %s" % out["sealed"].get("error")
+                return out
+        else:      # a build must carry it: without it nothing between her devices is sealed
+            out["sealed"] = {"ok": False, "error": "this build carries no encryption library (cryptography)"}
+            out["error"] = "sealed between devices: this build carries no encryption library (cryptography)"
+            return out
         t0, first, text = time.time(), None, ""
         body = {"model": b["id"], "stream": True, "max_tokens": 32, "temperature": 0,
                 "messages": [{"role": "user", "content": "What is the capital of France? Answer in one word."}],
