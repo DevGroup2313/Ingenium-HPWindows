@@ -51,9 +51,12 @@ except Exception:
     VERSION_INFO = None
 ONEDIR = os.environ.get('INGENIUM_ONEDIR') == '1'
 _own = [('ingenium.html', '.'), ('ingenium.ico', '.'), ('ingenium.png', '.')]
-for _f in ('app.json', 'THIRD_PARTY_NOTICES.txt', 'LICENCE.txt'):
+for _f in ('app.json', 'THIRD_PARTY_NOTICES.txt', 'LICENCE.txt', 'TERMS.txt', 'PRIVACY.txt'):   # 7.37: the terms and the privacy notice
     if os.path.isfile(os.path.join(SPECPATH, _f)):
         _own.append((_f, '.'))
+# 7.37: the licences THIRD_PARTY_NOTICES.txt points to travel beside it
+if os.path.isdir(os.path.join(SPECPATH, 'licences')):
+    _own.append(('licences', 'licences'))
 # The native engine travels packed (one file inside the exe); the app unpacks
 # it once into its data folder. Built without it, the app uses the slower
 # engine inside the page.
@@ -81,7 +84,8 @@ extra_hidden = []
 # absent is simply skipped, so this stays safe if a name is not installed.
 # certifi travels too: its cacert.pem is a DATA file, and the relay verifies
 # https calls (Ollama cloud, Claude) against it.
-for _pkg in ('webview', 'proxy_tools', 'clr', 'pythonnet', 'certifi'):
+# 7.37: cryptography (app_seal_737.py) seals what passes between her devices; its compiled part (_rust, with OpenSSL) travels whole
+for _pkg in ('webview', 'proxy_tools', 'clr', 'pythonnet', 'certifi', 'cryptography'):
     try:
         _d, _b, _h = collect_all(_pkg)
         extra_datas += _d
@@ -105,6 +109,9 @@ a = Analysis(
         'dulwich', 'dulwich.client', 'dulwich.repo', 'dulwich.objects', 'dulwich.pack', 'dulwich.protocol', 'urllib3',
         # 6.86: Fabrica reads every repository on this computer from the drive (app_disk_686.py)
         'dulwich.object_store', 'dulwich.index',
+        # 7.37 (app_seal_737.py): sealed between her devices
+        'cryptography', 'cryptography.hazmat.primitives.asymmetric.ec', 'cryptography.hazmat.primitives.ciphers.aead',
+        'cryptography.hazmat.primitives.kdf.hkdf', 'cryptography.hazmat.primitives.serialization', 'cryptography.hazmat.primitives.hashes',
         'webview.platforms.edgechromium',
         # R78: the clipboard for the edit panel's Paste and Copy (ingenium_app._win_clipboard_*)
         'ctypes',

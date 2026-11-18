@@ -1,0 +1,66 @@
+INGENIUM
+PRIVACY NOTICE
+Version 1, 18 November 2026. Made by Yannie D. Forest.
+
+============================================================================
+
+1. WHO THIS NOTICE IS FROM
+
+Ingenium is made by Yannie D. Forest. Questions about this notice: the
+contact shown in Settings, Ownership, Terms and privacy.
+
+2. WHAT INGENIUM KEEPS, AND WHERE
+
+Your work stays on the device you use Ingenium on: chats, notes, memory,
+settings, projects, apps you make and their versions, documents, your career
+profile, signing keys, your sign-ins to services you link, and the keys you
+give it for online models. In a browser, in its own storage for Ingenium's
+page; in the computer apps, also in files in Ingenium's own folder; on a
+phone or tablet, in the app's own storage. None of it is sent to its maker.
+
+3. SEALED WITH YOUR PASSWORD
+
+With protection on (Settings, Security), what Ingenium keeps is sealed with
+a key made from your password (AES-GCM, 256-bit), and backups are sealed
+whole. You also receive ten recovery words. If every way back in is lost, no
+one can open what is sealed. Settings, Security shows each protection's true
+state.
+
+4. WHEN INGENIUM GOES ONLINE
+
+Only when you use one of these, and only for that use:
+- Downloading a model: Hugging Face.
+- An online model, with your own key: the provider you choose (for example
+    Anthropic, OpenAI, Google or Moonshot AI).
+- A link to GitHub: GitHub.
+- Research and search tools: the services you ask, such as Crossref,
+    OpenAlex, Europe PMC, arXiv, Open Library, Wikipedia, DuckDuckGo or
+    Brave Search.
+- A job posting by its link: the posting's own site.
+- Dictation, on a copy without its speech files: those files, fetched
+    once.Each service handles what it receives under its own privacy policy.
+    Settings, Security, Offline only holds back every request to the
+    internet until you allow it.
+
+5. BETWEEN YOUR OWN DEVICES
+
+Your paired devices talk over your home network. Each device that pairs
+agrees on a key of its own with your computer, and you confirm four words on
+both screens; then everything between them is sealed end to end. A device
+paired before, or one that cannot seal, is guarded by the pairing code alone
+until it pairs again, and Settings shows which.
+
+6. YOUR CHOICES
+
+Its maker holds no data about you from Ingenium, so it is all in your hands
+on your device: see it, export it (Settings, Your data, Backup), delete it
+(Reset everything). For data an outside service holds, ask that service.
+
+7. CHILDREN
+
+Ingenium is not made for children under the age the lawyer sets.
+
+8. CHANGES
+
+A new version of this notice comes with a new release of Ingenium, with its
+date.
