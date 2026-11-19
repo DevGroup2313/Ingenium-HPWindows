@@ -458,6 +458,63 @@ jobs:
           cd "$RUNNER_TEMP/portable" && 7z a -tzip -mx=5 "$RUNNER_TEMP/${APP_FILE}-Windows-portable.zip" "$APP_FILE" > /dev/null
           ls -la "$RUNNER_TEMP"/*.zip "$RUNNER_TEMP/setup"
 
+      # 7.45: the Full and Gift editions as Windows apps of their own. Her words (19 November 2026): "I want to be able to download and
+      # install the Gift and Full editions of Ingenium on my HP Windows computer and other devices ... I want to be able to get it on my
+      # HP laptop." Each is this same app around that edition's page (made with the release in the Mac mini repository's editions/,
+      # checked by tools/get_editions.py). Her words the same day: "I will only have one edition per device", and "I don't want my data
+      # and my past chats to be lost when I replace my master edition of Ingenium with the new Full edition on my HP laptop".
+      #   Ingenium Full is Ingenium itself (the same name, program folder, data folder and id): installed over the master edition it
+      #   replaces it in place, and the full edition asks once to bring in her work (modules/r332.js); nothing on the disk moves.
+      #   Ingenium Gift keeps a data folder and an id of its own (IngeniumGift), so it never opens an owner's work, even on a computer
+      #   that once held the master edition. Ingenium's own build only: an app Fabrica packages from this kit has its own app.json.
+      - name: The Full and Gift editions' pages (from the Mac mini repository, checked)
+        if: env.APP_ID == 'com.yannieforest.ingenium'
+        run: python tools/get_editions.py "$RUNNER_TEMP/editions" "${{ github.ref_name }}"
+
+      - name: Build Ingenium Full and Ingenium Gift, each with its installer
+        if: env.APP_ID == 'com.yannieforest.ingenium'
+        shell: pwsh
+        run: |
+          function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { Write-Output "::error::Inno Setup is missing"; exit 1 }
+          Note "### The Full and Gift editions, each an app of its own"
+          foreach ($e in @(@{ k = 'full'; name = $env:APP_NAME; file = $env:APP_FILE; id = $env:APP_ID; pub = 'Ingenium-Full-Setup.exe' },
+                           @{ k = 'gift'; name = $env:APP_NAME; file = 'IngeniumGift'; id = "$env:APP_ID.gift"; pub = 'Ingenium-Gift-Setup.exe' })) {
+            $id = $e.id
+            $w = Join-Path $env:RUNNER_TEMP "ed-$($e.k)"
+            if (Test-Path $w) { Remove-Item -Recurse -Force $w }
+            New-Item -ItemType Directory -Force $w | Out-Null
+            # the repository as it was built above (its spec, tools, speech and rag/ with its vendor files), without the builds
+            Get-ChildItem -Force $PWD | Where-Object { $_.Name -notin @('dist', 'build', '.git') } | ForEach-Object { Copy-Item -Recurse -Force $_.FullName $w }
+            Copy-Item -Force (Join-Path $env:RUNNER_TEMP "editions\ingenium_$($e.k).html") (Join-Path $w 'ingenium.html')
+            ([ordered]@{ name = $e.name; app_id = $id; file_name = $e.file; test = 'model' } | ConvertTo-Json) | Set-Content -Encoding utf8NoBOM (Join-Path $w 'app.json')
+            Push-Location $w
+            python tools/stamp_build.py ingenium.html "$env:INGENIUM_VERSION"
+            $env:INGENIUM_ONEDIR = '1'
+            python -m PyInstaller --noconfirm --clean ingenium_win.spec
+            $code = $LASTEXITCODE
+            Remove-Item Env:INGENIUM_ONEDIR
+            Pop-Location
+            $dir = Join-Path $w "dist\$($e.file)"
+            $exe = Join-Path $dir "$($e.file).exe"
+            if ($code -ne 0 -or -not (Test-Path $exe)) { Write-Output "::error::$($e.name) could not be built"; exit 1 }
+            # the app starts and its own engine answers, as the main app's self-test asks
+            $o = Join-Path $env:RUNNER_TEMP "st-$($e.k).json"
+            $p = Start-Process -FilePath $exe -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $dir -Wait -PassThru
+            if ($p.ExitCode -ne 0) { if (Test-Path $o) { Get-Content $o }; Write-Output "::error::$($e.name) did not start its engine"; exit 1 }
+            $out = Join-Path $env:RUNNER_TEMP "setup-$($e.k)"
+            & $iscc /Qp "/DAppName=$($e.name)" "/DAppFile=$($e.file)" "/DAppIdent=$id" `
+              "/DAppVersion=$env:INGENIUM_VERSION" "/DVerNum=$env:INGENIUM_VERNUM" "/DRepoDir=$w" `
+              "/DSrcDir=$dir" "/DEngineDir=$(Join-Path $env:RUNNER_TEMP 'engine\windows-x64')" `
+              "/DOutDir=$out" installer\Ingenium.iss
+            if ($LASTEXITCODE -ne 0) { Write-Output "::error::the installer for $($e.name) could not be made"; exit 1 }
+            $setup = Get-Item (Join-Path $out "$($e.file)-Setup.exe")
+            $sha = (Get-FileHash (Join-Path $w 'ingenium.html') -Algorithm SHA256).Hash.ToLower()
+            Copy-Item -Force $setup.FullName (Join-Path $env:RUNNER_TEMP $e.pub)
+            Note ("* {0}: {1:N1} MB; it starts its engine; its page's fingerprint (SHA-256) {2}; its program and data under the name {3}" -f $e.pub, ($setup.Length / 1MB), $sha, $e.file)
+          }
+
       - name: Publish to Releases
         env:
           GH_TOKEN: ${{ github.token }}
@@ -469,5 +526,7 @@ jobs:
           echo "* The copy with the models: $SZ bytes" >> "$GITHUB_STEP_SUMMARY"
           if [ "$SZ" -le 2140000000 ]; then set -- "$@" "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "${APP_FILE}-Windows-with-models.zip"
           else echo "::warning::The copy with the models is $SZ bytes, over GitHub's limit: it is not published this time"; fi
+          # 7.45: the Full and Gift editions' installers, beside Ingenium's own (made above, in Ingenium's own build only)
+          for f in Ingenium-Full-Setup.exe Ingenium-Gift-Setup.exe; do if [ -f "$RUNNER_TEMP/$f" ]; then set -- "$@" "$RUNNER_TEMP/$f" "$f"; fi; done
           # R75: the Python-based package and the older name are retired
           OBSOLETE="${APP_FILE}-Windows.zip ${APP_FILE}-Windows-no-model.zip" bash tools/publish_release.sh Windows "$@"
