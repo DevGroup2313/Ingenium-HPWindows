@@ -48,7 +48,7 @@ import * as prompt from './prompt.js';
 import { createScheduler, DEFAULT_MINUTES } from './scheduler.js';
 import { createReranker } from './reranker.js';
 
-const PRINCIPAL = 'me';
+const PRINCIPAL = (globalThis.__ingProfile && globalThis.__ingProfile.owner === false && /^p[a-z0-9]{1,24}$/.test(globalThis.__ingProfile.id)) ? 'p:' + globalThis.__ingProfile.id : 'me';   // 7.44 (r331): each local profile its own reader
 
 const S = {
   status: bridge.available() ? 'idle' : 'off',   // off | idle | opening | open | loading | ready | locked | unavailable | failed
