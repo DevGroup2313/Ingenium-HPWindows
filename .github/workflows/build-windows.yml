@@ -499,10 +499,17 @@ jobs:
             $dir = Join-Path $w "dist\$($e.file)"
             $exe = Join-Path $dir "$($e.file).exe"
             if ($code -ne 0 -or -not (Test-Path $exe)) { Write-Output "::error::$($e.name) could not be built"; exit 1 }
-            # the app starts and its own engine answers, as the main app's self-test asks
+            # the app starts and its own engine answers, as the main app's self-test asks: on a copy laid out as the installer lays it out
+            # (the engine beside the program, in engine\windows-x64), so the installer's own sources stay as they were made
+            $t = Join-Path $env:RUNNER_TEMP "st-$($e.k)"
+            if (Test-Path $t) { Remove-Item -Recurse -Force $t }
+            Copy-Item -Recurse $dir $t
+            New-Item -ItemType Directory -Force (Join-Path $t 'engine') | Out-Null
+            Copy-Item -Recurse (Join-Path $env:RUNNER_TEMP 'engine\windows-x64') (Join-Path $t 'engine\windows-x64')
             $o = Join-Path $env:RUNNER_TEMP "st-$($e.k).json"
-            $p = Start-Process -FilePath $exe -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $dir -Wait -PassThru
+            $p = Start-Process -FilePath (Join-Path $t "$($e.file).exe") -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $t -Wait -PassThru
             if ($p.ExitCode -ne 0) { if (Test-Path $o) { Get-Content $o }; Write-Output "::error::$($e.name) did not start its engine"; exit 1 }
+            Remove-Item -Recurse -Force $t -ErrorAction SilentlyContinue
             $out = Join-Path $env:RUNNER_TEMP "setup-$($e.k)"
             & $iscc /Qp "/DAppName=$($e.name)" "/DAppFile=$($e.file)" "/DAppIdent=$id" `
               "/DAppVersion=$env:INGENIUM_VERSION" "/DVerNum=$env:INGENIUM_VERNUM" "/DRepoDir=$w" `
