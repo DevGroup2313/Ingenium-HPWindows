@@ -1,8 +1,8 @@
 Ingenium
-Version: 7.54 (20 November 2026)
+Version: 7.55 (20 November 2026)
 Edition: master
 Copyright (c) 2026 Yannie D. Forest. All rights reserved. See LICENCE.txt.
 The page below is the app itself. The Windows apps built from this repository carry it with their build number stamped in (tools/stamp_build.py), so each build's summary on GitHub lists the fingerprint of the copy inside it too.
 
 Fingerprints (SHA-256). A copy whose fingerprint differs is not the owner's release (LICENCE.txt):
-  bb6d4b1078736a9b52158323e0c52cb3fb9a0be450336c6b7d27a4feca4b2ff9  ingenium.html (88457105 bytes)
+  4fe23540d6aac4d8620f87ba32097c439602cd2e0016daf0c7a241ee175f9edd  ingenium.html (88564946 bytes)
