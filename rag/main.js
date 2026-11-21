@@ -49,6 +49,19 @@ import { createScheduler, DEFAULT_MINUTES } from './scheduler.js';
 import { createReranker } from './reranker.js';
 
 const PRINCIPAL = (globalThis.__ingProfile && globalThis.__ingProfile.owner === false && /^p[a-z0-9]{1,24}$/.test(globalThis.__ingProfile.id)) ? 'p:' + globalThis.__ingProfile.id : 'me';   // 7.44 (r331): each local profile its own reader
+// 7.59, her choice (21 November 2026): "One index per profile". The owner keeps rag.sqlite3; another person's profile has its own file,
+// sealed with that profile's own key while it has a sign-in. The first open moves each other profile's folders out of the shared file
+// (store.worker.js, splitShared), so nothing is read again.
+const DBNAME = PRINCIPAL === 'me' ? 'rag.sqlite3' : 'rag-' + PRINCIPAL.slice(2) + '.sqlite3';
+const LOCK = () => globalThis.IngLock || null;
+// the index's key, when this profile has a sign-in: waits for the sign-in, then derives it (IngLock.ragKey, HKDF info "ingenium-rag 1")
+async function sealArgs() {
+  const l = LOCK();
+  if (!l || typeof l.active !== 'function' || !l.active() || typeof l.ragKey !== 'function') return null;
+  await l.ready();
+  const k = await l.ragKey();
+  return { key: k.b64, kid: k.kid };
+}
 
 const S = {
   status: bridge.available() ? 'idle' : 'off',   // off | idle | opening | open | loading | ready | locked | unavailable | failed
@@ -83,9 +96,13 @@ const PLAIN = {
   NOT_ALLOWED: 'This passage is in a folder that cannot be opened for you.',
   CHANGED: 'The file changed while it was being opened. Try again.',
   RERANK_MISSING: "The reranker's model is not in this copy of the app, so the passages keep the search's own order.",
+  LOCKED: 'The folder search is sealed with your password. Sign in, then try again.',
+  OTHER_KEY: "The folder search's memory was sealed under another sign-in, so it cannot be opened with this one. It can start again from nothing: your files are not touched, and your folders are read again.",
+  SEAL_BROKEN: "Part of the folder search's sealed memory does not open as it was sealed: it was changed or damaged. It can start again from nothing: your files are not touched, and your folders are read again.",
+  SEAL_UNAVAILABLE: 'This copy of the app is missing the part that seals the folder search. Install Ingenium again.',
   CORRUPT: "The folder search's memory was damaged, perhaps because Ingenium was closed while it was saving. It can start again from nothing: your files are not touched, and your folders are read again.",
 };
-const FATAL_STATUS = { OPFS_LOCKED: 'locked', OPFS_UNAVAILABLE: 'unavailable', SCHEMA_TOO_NEW: 'failed', WORKER_FAILED: 'failed', DIMS_MISMATCH: 'failed', CORRUPT: 'damaged' };
+const FATAL_STATUS = { OPFS_LOCKED: 'locked', OPFS_UNAVAILABLE: 'unavailable', SCHEMA_TOO_NEW: 'failed', WORKER_FAILED: 'failed', DIMS_MISMATCH: 'failed', CORRUPT: 'damaged', OTHER_KEY: 'damaged', SEAL_BROKEN: 'damaged', SEAL_UNAVAILABLE: 'failed' };
 // The tests' own store operations (debug.*) are switched on only when a test page sets this before loading the folder search.
 const TESTING = () => typeof globalThis !== 'undefined' && globalThis.__ING_RAG_TEST__ === true;
 
@@ -122,7 +139,7 @@ function openStore() {
     setStatus('opening');
     const store = createStore({ debug: TESTING() });
     let opened;
-    try { opened = await store.open(); }
+    try { opened = await store.open({ dbName: DBNAME, split: true, seal: await sealArgs() }); }
     catch (e) { try { store.terminate(); } catch (_) { /* gone */ } throw explain(e); }
     try { S.principalId = (await store.principal.ensure({ name: PRINCIPAL })).id; }
     catch (e) { try { store.terminate(); } catch (_) { /* gone */ } throw explain(e); }
@@ -539,12 +556,25 @@ async function shutdown() {
   return { shutdown: true };
 }
 
+// 7.59: whether this profile's index is sealed, for Settings, Security (modules/r340.js): {open: false} while the folder search is not open
+async function sealState() {
+  if (!S.store) return { open: false };
+  try { return Object.assign({ open: true }, await S.store.call('seal.state')); } catch (e) { return { open: true, error: e && e.code || 'ERROR' }; }
+}
+
+// 7.59: a profile the owner removes takes its own index with it (rag-<id>.sqlite3), whether or not it was sealed
+async function dropProfile(pid) {
+  if (!bridge.available()) return { dropped: 0 };
+  const store = await openStore();
+  return store.call('profile.drop', { pid: String(pid) });
+}
+
 export const IngRag = {
   version: 1,
   principal: PRINCIPAL,
   available: () => bridge.available(),
   ready, folders, addFolder, removeFolder, indexFolder, stopReading, stats, state, running, config, shutdown, suggestedWorkers, rebuild, retrieve,
-  openSource, prompt, schedule, reconcile, scheduleState,
+  openSource, prompt, schedule, reconcile, scheduleState, sealState, dropProfile,
   on(fn) { S.listeners.add(fn); return () => S.listeners.delete(fn); },
   get _store() { return S.store; },
   get _embedder() { return S.embedder; },
@@ -554,4 +584,26 @@ export const IngRag = {
 };
 
 if (typeof window !== 'undefined') window.IngRag = IngRag;
+
+// 7.59: the key comes and goes with the sign-in. Held: the open index is sealed with it (a plain one in place). Dropped by a lock: the
+// worker lets the key and the opened sectors go (the page starts again then in any case). The sign-in turned off: r197 waits for
+// __ingBeforeOff before its record goes, while the key is still in hand, and the index is opened again in place; a failure keeps
+// protection on, so the index is never left sealed under a key nobody can derive any more.
+if (typeof window !== 'undefined') {
+  window.addEventListener('ing-keys', (e) => {
+    const held = !!(e && e.detail && e.detail.held), l = LOCK();
+    if (!S.store) return;
+    if (held) sealArgs().then((k) => (k ? S.store.call('seal.key', k) : null)).catch(() => { /* sealed at the next open */ });
+    else if (l && l.active && l.active()) S.store.call('seal.key', {}).catch(() => { /* the worker goes with the page */ });
+  });
+  const before = window.__ingBeforeOff;
+  window.__ingBeforeOff = async () => {
+    if (typeof before === 'function') await before();
+    if (!bridge.available()) return;   // no index where there is no folder bridge
+    let store;
+    try { store = await openStore(); }
+    catch (e) { if (e && (e.code === 'NO_BRIDGE' || e.code === 'OPFS_UNAVAILABLE')) return; throw explain(e); }
+    await store.call('seal.openAll');
+  };
+}
 export default IngRag;

@@ -39,7 +39,7 @@ import { ftsMatch } from './ftsquery.js';   // phase 2: a question's words, safe
 const DEFAULT_DIMS = 384;
 const POOL_NAME = 'ingenium-rag';       // the VFS name, and the OPFS directory '.ingenium-rag' that holds the database files
 const POOL_DIR = '.ingenium-rag';
-const POOL_CAPACITY = 12;               // files the pool may hold: the database, its journal, spare names for tests
+const POOL_CAPACITY = 32;               // files the pool may hold: each profile's index (7.59: one per profile), a journal, spare names for tests
 const TABLES = ['meta', 'principals', 'folders', 'folder_acl', 'files', 'chunks', 'chunks_fts', 'chunks_vec', 'emb_cache'];
 
 class StoreError extends Error {
@@ -53,6 +53,7 @@ let db = null;        // the one connection
 let conn = null;      // {dbName, vfs, dims} of the open database
 let faultAfter = null; // debug.fail: throw inside the next file.replace after this many chunks
 let lastOpen = null;   // the arguments of the last successful open, for reset
+let lastSplit = null;  // 7.59: what the one-time split of the shared index did, for info() and the tests
 const DEBUG = (() => { try { return new URL(self.location.href).searchParams.get('debug') === '1'; } catch (_) { return false; } })();
 
 // ------------------------------------------------------------------------------------------------ schema and migrations
@@ -252,6 +253,8 @@ function collectTransfer(result) {
 // SQLITE_CORRUPT (11, with its extended codes such as CORRUPT_VTAB) and SQLITE_NOTADB (26) are reported as CORRUPT.
 const isCorrupt = (e) => !!e && ((e.code === 'CORRUPT') || (Number.isInteger(e.resultCode) && [11, 26].includes(e.resultCode & 0xff)) || /SQLITE_(CORRUPT|NOTADB)/.test(String(e.message)));
 function serializeError(e) {
+  const se = SEAL ? SEAL.takeError() : null;   // 7.59: the sealing's own failure, under SQLite's I/O failure
+  if (se) e = Object.assign(new StoreError(se.code, se.message), { resultCode: e && e.resultCode != null ? e.resultCode : null });
   return {
     name: (e && e.name) || 'Error',
     message: String((e && e.message) || e),
@@ -311,6 +314,102 @@ async function ensurePool(a) {
   return pool;
 }
 
+// ------------------------------------------------------------------------------------------------ 7.59: one index per profile, sealed
+// Her choice (21 November 2026): "One index per profile", each sealed with that profile's own key (rag/seal.js). Until 7.58 every
+// profile's folders lived in one file, rag.sqlite3, each profile reading only its own through its principal ("me" for the owner,
+// "p:<id>" for another person's profile). The owner keeps that file; each other profile has its own, rag-<id>.sqlite3. The first time
+// the shared file is opened while it can be read (plain), each other profile's folders, their files, passages, words (FTS5), vectors
+// (vec0) and cached vectors are copied into that profile's own file, so nothing is read or embedded again, and then taken out of the
+// shared file. Only after that is a key handed to the sealing, so no profile's rows are ever sealed under another profile's key.
+const SHARED = 'rag.sqlite3';
+let SEAL = null;                 // rag/seal.js, once a sealed open asks for it
+async function sealPart(vendorBase) {
+  if (!SEAL) {
+    let m;
+    try { m = await import(new URL('./seal.js', import.meta.url).href); if (!(await m.load(vendorBase))) throw new Error('no cipher'); }
+    catch (e) { throw new StoreError('SEAL_UNAVAILABLE', 'the cipher the folder search seals its index with is missing from this app (vendor/noble): ' + (e && e.message || e)); }
+    m.install(); SEAL = m;
+  }
+  return SEAL;
+}
+function copyRows(src, t, table, where, bind) {
+  const rows = src.selectObjects('select * from ' + table + ' where ' + where, bind);
+  if (!rows.length) return 0;
+  const cols = Object.keys(rows[0]);
+  const st = t.prepare('insert or ignore into ' + table + '(' + cols.join(',') + ') values (' + cols.map(() => '?').join(',') + ')');
+  try { for (const r of rows) st.bind(cols.map((c) => r[c])).stepReset(); } finally { st.finalize(); }
+  return rows.length;
+}
+function splitShared() {
+  if (!pool.getFileNames().includes('/' + SHARED)) return { moved: 0 };
+  let src = null;
+  try { src = new pool.OpfsSAHPoolDb('/' + SHARED); if (currentVersion(src) === 0) { src.close(); return { moved: 0 }; } }
+  catch (e) { try { if (src) src.close(); } catch (_) { /* gone */ } return { moved: 0, unread: true }; }   // sealed by its owner: split already
+  const out = { moved: 0, folders: 0, chunks: 0, profiles: [] };
+  try {
+    // as the store's own connection: deleted rows overwritten, and a folder's ACL rows going with it
+    src.exec('pragma foreign_keys = on'); src.exec('pragma secure_delete = on');
+    const dims = vecDimsOf(src) || DEFAULT_DIMS;
+    const others = src.selectObjects("select id, name from principals where name like 'p:%'");
+    for (const pr of others) {
+      const pid = pr.name.slice(2);
+      if (!/^p[a-z0-9]{1,24}$/.test(pid)) continue;
+      try {
+      const folders = src.selectValues('select folder_id from folder_acl where principal_id = ?', [pr.id]);
+      const t = new pool.OpfsSAHPoolDb('/rag-' + pid + '.sqlite3');
+      try {
+        if (currentVersion(t) === 0) t.exec('pragma auto_vacuum = 2');
+        const have = currentVersion(t) === 0 ? null : vecDimsOf(t);
+        if (have != null && have !== dims) throw new StoreError('DIMS_MISMATCH', 'the profile index ' + pid + ' holds vectors of ' + have + ' values, the shared one ' + dims);
+        migrate(t, MIGRATIONS, { dims });
+        t.exec('begin');
+        try {
+          copyRows(src, t, 'principals', 'id = ?', [pr.id]);
+          for (const fid of folders) {
+            copyRows(src, t, 'folders', 'id = ?', [fid]);
+            t.exec({ sql: 'insert or ignore into folder_acl(folder_id, principal_id) values (?, ?)', bind: [fid, pr.id] });
+            copyRows(src, t, 'files', 'folder_id = ?', [fid]);
+            out.chunks += copyRows(src, t, 'chunks', 'folder_id = ?', [fid]);
+            const ids = src.selectValues('select id from chunks where folder_id = ?', [fid]);
+            const gF = src.prepare('select text, heading_path, folder_id from chunks_fts where rowid = ?'), gV = src.prepare('select embedding from chunks_vec where rowid = ?');
+            const pF = t.prepare('insert into chunks_fts(rowid, text, heading_path, folder_id) values (?,?,?,?)'), pV = t.prepare('insert into chunks_vec(rowid, folder_id, embedding) values (?,?,?)');
+            try {
+              for (const id of ids) {
+                if (gF.bind(id).step()) { const r = gF.get([]); pF.bind([id, r[0], r[1], r[2]]).stepReset(); } gF.reset();
+                if (gV.bind(id).step()) { const v = gV.get(0); pV.bind([id, fid, v]).stepReset(); } gV.reset();
+              }
+            } finally { gF.finalize(); gV.finalize(); pF.finalize(); pV.finalize(); }
+            copyRows(src, t, 'emb_cache', 'hash in (select content_hash from chunks where folder_id = ?)', [fid]);
+            out.folders++;
+          }
+          t.exec('commit');
+        } catch (e) { try { t.exec('rollback'); } catch (_) { /* gone */ } throw e; }
+      } finally { t.close(); }
+      // taken out of the shared file: a folder only this profile could read goes whole; a folder shared with another keeps its rows
+      const keepDb = db, keepConn = conn; db = src; conn = { dbName: SHARED, vfs: 'opfs-sahpool', dims };
+      try {
+        for (const fid of folders) {
+          const others2 = num(src.selectValue('select count(*) from folder_acl where folder_id = ? and principal_id <> ?', [fid, pr.id]));
+          if (others2) src.exec({ sql: 'delete from folder_acl where folder_id = ? and principal_id = ?', bind: [fid, pr.id] });
+          else OPS['folder.remove']({ folderId: fid, prune: false });
+        }
+        src.exec({ sql: 'delete from principals where id = ?', bind: [pr.id] });
+      } finally { db = keepDb; conn = keepConn; }
+      out.moved++; out.profiles.push(pid);
+      } catch (e) { (out.failed = out.failed || []).push({ profile: pid, code: e && e.code || 'ERROR', message: String(e && e.message || e).slice(0, 200) }); }
+    }
+    // nothing of a moved profile may stay readable in the shared file, which stays plain until the owner signs in: the word index
+    // merged into one segment (FTS5 keeps a deleted row's terms in its old segments until a merge), then the file rebuilt (VACUUM),
+    // so no freed page keeps a passage; the old pages go with the journal, which the pool truncates when it is deleted
+    if (out.moved) {
+      src.exec("insert into chunks_fts(chunks_fts) values('optimize')");
+      src.exec('pragma temp_store = memory');
+      src.exec('vacuum');
+    }
+  } finally { src.close(); }
+  return out;
+}
+
 async function open(a) {
   const dbName = a.dbName == null ? 'rag.sqlite3' : a.dbName;
   const vfs = a.vfs == null ? 'opfs-sahpool' : a.vfs;
@@ -323,13 +422,20 @@ async function open(a) {
     throw new StoreError('ALREADY_OPEN', 'the store is already open on ' + conn.dbName + ' (' + conn.vfs + '); close it first');
   }
   if (typeof a.vendorBase !== 'string' || !/\/$/.test(a.vendorBase)) throw bad('vendorBase must be the URL of the vendor folder, ending in /');
+  if (a.seal != null && (typeof a.seal !== 'object' || typeof a.seal.key !== 'string' || !/^[0-9a-f]{16}$/.test(String(a.seal.kid)))) throw bad('seal must be {key: base64 of 32 bytes, kid: 16 hex digits}');
   await loadSqlite(a.vendorBase);
+  // before the pool reads any file: always, so that a sealed index read without its key says so, and is never taken for a damaged one
+  // (which the card would offer to start again from nothing); without the cipher a plain index still opens, a sealed one cannot
+  if (vfs === 'opfs-sahpool') { try { await sealPart(a.vendorBase); } catch (e) { if (a.seal) throw e; } }
 
   let d, leftJournal = false;
   if (vfs === 'memory') {
     d = new sqlite3.oo1.DB(':memory:', 'c');
   } else {
     await ensurePool(a);
+    // the split reads and writes with no key held, so no profile's rows are sealed under another's key; the key comes after
+    if (a.split) { if (SEAL) { SEAL.forget(); SEAL.setKey(null, null); } lastSplit = splitShared(); SEAL && SEAL.takeError(); }
+    if (SEAL) { SEAL.forget(); if (a.seal) SEAL.setKey(a.seal.key, a.seal.kid, { convert: true }); else SEAL.setKey(null, null); }
     leftJournal = pool.getFileNames().includes('/' + dbName + '-journal');
     d = new pool.OpfsSAHPoolDb('/' + dbName);
   }
@@ -381,7 +487,15 @@ async function info() {
     bytes: sizeNow(),
     persisted,
     storage,
+    sealed: sealState(),
+    split: lastSplit,
   };
+}
+
+// 7.59: whether this index is sealed: off (no sealing part loaded), or on with the key held or not, and the files met so far
+function sealState() {
+  if (!SEAL) return { on: false };
+  return { on: true, keyed: SEAL.keyed(), files: SEAL.census() };
 }
 
 // ------------------------------------------------------------------------------------------------ the ops
@@ -407,6 +521,38 @@ const OPS = {
     return { before, after: sizeNow(), mode, blocks };
   },
   close() { if (db) { try { db.close(); } finally { db = null; conn = null; } } return { closed: true }; },
+
+  // 7.59: the profile's key arrives after a sign-in (or the sign-in is turned on) while the index is open; every plain file met
+  // is sealed with it in place. Without a key (a lock) the opened sectors held in memory are let go, and the key with them.
+  async 'seal.key'(a) {
+    if (!a || a.key == null) { if (SEAL) { SEAL.setKey(null, null); SEAL.forget(); } if (lastOpen) delete lastOpen.seal; return sealState(); }
+    if (typeof a.key !== 'string' || !/^[0-9a-f]{16}$/.test(String(a.kid))) throw bad('seal.key needs {key: base64 of 32 bytes, kid: 16 hex digits}');
+    if (!SEAL) { if (!lastOpen) throw new StoreError('NOT_OPEN', 'the store is not open'); await sealPart(lastOpen.vendorBase); }
+    SEAL.setKey(a.key, a.kid, { convert: true });
+    const sealed = SEAL.sealAll();
+    if (lastOpen) lastOpen.seal = { key: a.key, kid: a.kid };
+    return Object.assign(sealState(), { sealedNow: sealed });
+  },
+  // turning the sign-in off: every sealed file this worker has met is opened again in place, while the key is still here
+  'seal.openAll'() {
+    if (!SEAL || !SEAL.keyed()) return Object.assign(sealState(), { openedNow: 0 });
+    const n = SEAL.openAll();
+    SEAL.setKey(null, null);   // every file it met is plain now, and known as such
+    if (lastOpen) delete lastOpen.seal;
+    return Object.assign(sealState(), { openedNow: n });
+  },
+  'seal.state'() { return sealState(); },
+  // 7.59: a profile removed by the owner: its own index goes, file and journal (never the index open now)
+  'profile.drop'(a) {
+    const pid = String(a && a.pid || '');
+    if (!/^p[a-z0-9]{1,24}$/.test(pid)) throw bad('pid must be a profile id');
+    if (!pool) throw new StoreError('NOT_OPEN', 'the store is not open');
+    const name = 'rag-' + pid + '.sqlite3';
+    if (conn && conn.dbName === name) throw new StoreError('IN_USE', 'this profile\'s index is the one open now');
+    let dropped = 0;
+    for (const f of ['/' + name, '/' + name + '-journal']) if (pool.getFileNames().includes(f)) { pool.unlink(f); dropped++; }
+    return { dropped };
+  },
 
   // Starts the folder search index again from nothing (after it was found damaged): the database files are deleted and a new,
   // empty database is opened with the same arguments. The person's own files are never touched.
@@ -716,6 +862,7 @@ let chain = Promise.resolve();
 async function handle(m) {
   const { id, op, args } = m || {};
   try {
+    if (SEAL) SEAL.takeError();
     const f = OPS[op];
     if (!Object.prototype.hasOwnProperty.call(OPS, op) || typeof f !== 'function' || (!DEBUG && String(op).startsWith('debug.'))) throw new StoreError('UNKNOWN_OP', 'unknown op ' + op);
     const result = await f(args || {});

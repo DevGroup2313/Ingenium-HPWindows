@@ -121,6 +121,9 @@ export class Store {
     // may read; rag/retriever.js fuses them). The question's vector is transferred to the worker.
     this.search = { fts: r('search.fts'), vec: r('search.vec', (a) => [a.embedding]) };
     this.chunk = { get: r('chunk.get') };
+    // 7.59: the index's key (rag/seal.js): {key, kid} to seal, {} to let it go; openAll opens it again in place; state says which
+    this.seal = { key: r('seal.key'), openAll: r('seal.openAll'), state: r('seal.state') };
+    this.profile = { drop: r('profile.drop') };
     this.debug = { rows: r('debug.rows'), sql: r('debug.sql'), fail: r('debug.fail'), migrate: r('debug.migrate'), wipe: r('debug.wipe') };
   }
   /**

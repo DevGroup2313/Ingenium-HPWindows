@@ -90,6 +90,20 @@
     "package/mammoth.browser.min.js": "mammoth/mammoth.browser.min.js",
     "package/LICENSE": "mammoth/LICENSE"
    }
+  },
+  {
+   "name": "@noble/ciphers",
+   "version": "2.4.0",
+   "licence": "MIT",
+   "integrity": "sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==",
+   "why": "XChaCha20-Poly1305 for the folder search's index, sealed sector by sector with the profile's own key (Ingenium 7.59, rag/seal.js): SQLite's opfs-sahpool file system reads and writes synchronously, and WebCrypto has no synchronous cipher. Checked against OpenSSL's chacha20-poly1305 on 200 of 200 random cases (20 November 2026).",
+   "files": {
+    "package/chacha.js": "noble/chacha.js",
+    "package/_arx.js": "noble/_arx.js",
+    "package/_poly1305.js": "noble/_poly1305.js",
+    "package/utils.js": "noble/utils.js",
+    "package/LICENSE": "noble/LICENSE"
+   }
   }
  ],
  "hf": [
