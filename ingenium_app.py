@@ -3750,6 +3750,9 @@ class IngeniumApi(_LiteWindows):
     def load_state(self):
         return _load_state()
 
+    def display_zoom(self, f=None):
+        return _display_zoom(f)
+
     def save_state(self, raw):
         return _save_state(raw)
 
@@ -4426,6 +4429,9 @@ class IngeniumApiSingle(_LiteWindows):
 
     def load_state(self):
         return _load_state()
+
+    def display_zoom(self, f=None):
+        return _display_zoom(f)
 
     def save_state(self, raw):
         return _save_state(raw)
@@ -10230,6 +10236,62 @@ def _desk_path():
     if d is None:
         return None
     return d.parent / "desk.json"
+
+
+def _display_zoom(f=None):
+    """7.75: the window's own zoom (WKWebView's pageZoom), so Ingenium fills a large screen without spilling (app_zoom_775.py)."""
+    if sys.platform != "darwin":
+        return {"ok": False, "why": "This app zooms with the keyboard here: Control and plus, Control and minus."}
+    try:
+        from webview.platforms.cocoa import BrowserView
+        from PyObjCTools import AppHelper
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "why": "The window cannot zoom here (%s)." % e}
+    views = [i.webview for i in list(BrowserView.instances.values()) if getattr(i, "webview", None) is not None]
+    if not views:
+        return {"ok": False, "why": "No window yet."}
+    def on_main(fn, wait=2.0):
+        """WebKit is asked on the app's main thread; the bridge calls in from another, so it waits there for the answer."""
+        import threading
+        try:
+            from Foundation import NSThread
+            if NSThread.isMainThread():
+                return fn()
+        except Exception:  # noqa: BLE001
+            pass
+        box, ev = {}, threading.Event()
+
+        def run():
+            try:
+                box["v"] = fn()
+            except Exception as e:  # noqa: BLE001
+                box["e"] = e
+            finally:
+                ev.set()
+        AppHelper.callAfter(run)
+        if not ev.wait(wait):
+            raise TimeoutError("the window did not answer")
+        if "e" in box:
+            raise box["e"]
+        return box["v"]
+    if f is None:
+        try:
+            return {"ok": True, "zoom": float(on_main(lambda: views[0].pageZoom()))}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "why": "This version of macOS cannot zoom the window (%s)." % e}
+    try:
+        z = max(0.8, min(2.0, float(f)))
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "why": "Not a size."}
+
+    def go():
+        for v in views:
+            try:
+                v.setPageZoom_(z)
+            except Exception:  # noqa: BLE001
+                pass
+    AppHelper.callAfter(go)
+    return {"ok": True, "zoom": z}
 
 
 def _load_state():
