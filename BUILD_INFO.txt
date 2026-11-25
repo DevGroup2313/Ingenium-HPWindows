@@ -5,4 +5,4 @@ Copyright (c) 2026 Yannie D. Forest. All rights reserved. See LICENCE.txt.
 The page below is the app itself. The Windows apps built from this repository carry it with their build number stamped in (tools/stamp_build.py), so each build's summary on GitHub lists the fingerprint of the copy inside it too.
 
 Fingerprints (SHA-256). A copy whose fingerprint differs is not the owner's release (LICENCE.txt):
-  5539cc32c425575ccdf8ca63e25f2345b05ea15040e1b64a955047a65c073428  ingenium.html (95683851 bytes)
+  9c00e356d0eb66eb0ebcc879a9d1706e5a7333b2116a9412c301f1b4738d44fb  ingenium.html (95683965 bytes)
