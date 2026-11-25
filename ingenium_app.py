@@ -3750,6 +3750,19 @@ class IngeniumApi(_LiteWindows):
     def load_state(self):
         return _load_state()
 
+    # 7.93: scheduled backups, into a folder she chooses (app_backup_793.py)
+    def backup_choose_place(self):
+        return _backup_choose_793(getattr(self, "_main_window", None))
+
+    def backup_write(self, folder, name, b64, first=False, last=False):
+        return _backup_write_793(folder, name, b64, first, last)
+
+    def backup_files(self, folder):
+        return _backup_files_793(folder)
+
+    def backup_remove(self, folder, name):
+        return _backup_remove_793(folder, name)
+
     def display_zoom(self, f=None):
         return _display_zoom(f)
 
@@ -4429,6 +4442,19 @@ class IngeniumApiSingle(_LiteWindows):
 
     def load_state(self):
         return _load_state()
+
+    # 7.93: scheduled backups, into a folder she chooses (app_backup_793.py)
+    def backup_choose_place(self):
+        return _backup_choose_793(getattr(self, "_main_window", None))
+
+    def backup_write(self, folder, name, b64, first=False, last=False):
+        return _backup_write_793(folder, name, b64, first, last)
+
+    def backup_files(self, folder):
+        return _backup_files_793(folder)
+
+    def backup_remove(self, folder, name):
+        return _backup_remove_793(folder, name)
 
     def display_zoom(self, f=None):
         return _display_zoom(f)
@@ -10294,6 +10320,83 @@ def _display_zoom(f=None):
     return {"ok": True, "zoom": z}
 
 
+_BACKUP_NAME_793 = re.compile(r"^Ingenium backup [0-9][0-9 .\-]{6,40}\.(zip|ingenium)$")
+
+
+def _backup_folder_793(folder):
+    """The folder she chose: it must be a folder that exists."""
+    folder = os.path.abspath(os.path.expanduser(str(folder or "")))
+    if not folder or not os.path.isdir(folder):
+        raise ValueError("That folder is not there any more. Choose it again.")
+    return folder
+
+
+def _backup_choose_793(win):
+    try:
+        folder = _ask_folder(win)
+    except Exception:  # noqa: BLE001
+        log_problem("backup_choose_place: the folder dialog", sys.exc_info())
+        return {"ok": False, "error": "The folder dialog could not be opened."}
+    if not folder:
+        return {"ok": False, "cancelled": True}
+    return {"ok": True, "folder": folder}
+
+
+def _backup_write_793(folder, name, b64, first, last):
+    """A piece of a backup: appended to <name>.part; once the last piece is in, the file takes its name (so a half-written backup never
+    looks like a whole one)."""
+    import base64
+    try:
+        folder = _backup_folder_793(folder)
+        name = os.path.basename(str(name or ""))
+        if not _BACKUP_NAME_793.match(name):
+            return {"ok": False, "error": "That is not the name of one of Ingenium's backups."}
+        part = os.path.join(folder, name + ".part")
+        data = base64.b64decode(str(b64 or ""))
+        with open(part, "wb" if first else "ab") as fh:
+            fh.write(data)
+        if last:
+            final = os.path.join(folder, name)
+            os.replace(part, final)
+            return {"ok": True, "path": final, "size": os.path.getsize(final)}
+        return {"ok": True}
+    except Exception as e:  # noqa: BLE001
+        log_problem("backup_write", sys.exc_info())
+        return {"ok": False, "error": str(e)}
+
+
+def _backup_files_793(folder):
+    try:
+        folder = _backup_folder_793(folder)
+        out = []
+        for n in os.listdir(folder):
+            if _BACKUP_NAME_793.match(n):
+                f = os.path.join(folder, n)
+                try:
+                    out.append({"name": n, "size": os.path.getsize(f), "at": int(os.path.getmtime(f) * 1000)})
+                except OSError:
+                    pass
+        out.sort(key=lambda x: x["at"], reverse=True)
+        return {"ok": True, "folder": folder, "files": out}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)}
+
+
+def _backup_remove_793(folder, name):
+    try:
+        folder = _backup_folder_793(folder)
+        name = os.path.basename(str(name or ""))
+        if not _BACKUP_NAME_793.match(name):
+            return {"ok": False, "error": "That is not one of Ingenium's backups."}
+        f = os.path.join(folder, name)
+        if os.path.isfile(f):
+            os.remove(f)
+        return {"ok": True}
+    except Exception as e:  # noqa: BLE001
+        log_problem("backup_remove", sys.exc_info())
+        return {"ok": False, "error": str(e)}
+
+
 def _load_state():
     try:
         p = _desk_path()
@@ -15969,7 +16072,7 @@ def _disk_stash_apply(rid, n, payload, drop=False):
 _self_758 = True
 # what this computer app is: its release, and the owner's public keys (release.py writes both in at each release, from version.json and
 # security/owner_keys.json, the halves Settings saves; only public halves, never a private part)
-_SELF_RELEASE = "7.92"  # ING-SELF-RELEASE
+_SELF_RELEASE = "7.94"  # ING-SELF-RELEASE
 _SELF_KEYS = [{"kid": "iej1hHjzk8YQm5BBv-52cR", "x": "jLimQPq8WiSfRge_iu7Qe7-fE-lBn7z6kfyHF7ehzco", "y": "fwgCio0OxurUKmdZPXbMT9Hp8wXzcz4p3G5GlS7AUUA"}, {"kid": "CdbXeLQDHJ63NSC4cT0xnK", "x": "p5utS3RZvzR8S_P4kuweAB7GMgpgtBWnI-8Eeb4YQBk", "y": "83hP2W7P9SnUssIEnIyJdUipkr_DHS6SE-dnKoEgVgo"}]  # ING-SELF-KEYS
 _SELF = {"lock": threading.RLock(), "read": {}, "last": None, "told": set()}
 _SELF_KIND = "ingenium-release-signature"
