@@ -15969,7 +15969,7 @@ def _disk_stash_apply(rid, n, payload, drop=False):
 _self_758 = True
 # what this computer app is: its release, and the owner's public keys (release.py writes both in at each release, from version.json and
 # security/owner_keys.json, the halves Settings saves; only public halves, never a private part)
-_SELF_RELEASE = "7.87"  # ING-SELF-RELEASE
+_SELF_RELEASE = "7.88"  # ING-SELF-RELEASE
 _SELF_KEYS = [{"kid": "iej1hHjzk8YQm5BBv-52cR", "x": "jLimQPq8WiSfRge_iu7Qe7-fE-lBn7z6kfyHF7ehzco", "y": "fwgCio0OxurUKmdZPXbMT9Hp8wXzcz4p3G5GlS7AUUA"}, {"kid": "CdbXeLQDHJ63NSC4cT0xnK", "x": "p5utS3RZvzR8S_P4kuweAB7GMgpgtBWnI-8Eeb4YQBk", "y": "83hP2W7P9SnUssIEnIyJdUipkr_DHS6SE-dnKoEgVgo"}]  # ING-SELF-KEYS
 _SELF = {"lock": threading.RLock(), "read": {}, "last": None, "told": set()}
 _SELF_KIND = "ingenium-release-signature"
