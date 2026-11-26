@@ -5178,10 +5178,65 @@ def _save_models_index():
 
 
 def _model_path_for(mid):
-    if mid in _MODEL_PATHS:
-        return _MODEL_PATHS[mid]
+    p = _MODEL_PATHS.get(mid)
+    if p and os.path.isfile(p):
+        return p
+    # 7.97 (app_quit_models_797.py): read the list again; ask for the built-in models; then look by name wherever models are kept
     _load_models_index()
-    return _MODEL_PATHS.get(mid)
+    p = _MODEL_PATHS.get(mid)
+    if p and os.path.isfile(p):
+        return p
+    if str(mid).startswith("builtin-"):
+        try:
+            _builtin_models()
+        except Exception:
+            log_problem("models: the built-in models could not be listed", sys.exc_info())
+        p = _MODEL_PATHS.get(mid)
+        if p and os.path.isfile(p):
+            return p
+    found = _model_find_797(str(mid))
+    if found:
+        _MODEL_PATHS[mid] = found
+        _MODEL_AWAY.pop(mid, None)
+        _save_models_index()
+        log_problem("models: %s found again at %s" % (mid, found))
+        return found
+    return p
+
+
+def _model_find_797(mid):
+    """7.97: a model's file by every name it can have, in every place Ingenium keeps models; None when it is nowhere."""
+    names = []
+    rec = _MODEL_AWAY.get(mid) or {}
+    meta = _MODEL_META.get(mid) or (rec.get("meta") if isinstance(rec.get("meta"), dict) else {}) or {}
+    for n in (os.path.basename(str(rec.get("path") or "")),
+              ("l" + str(meta.get("sha256"))[:12] + ".gguf") if meta.get("sha256") else "",
+              mid[len("builtin-"):] if mid.startswith("builtin-") else "",
+              str(meta.get("file") or ""), _safe_id(mid)):
+        n = os.path.basename(n)
+        if n and n not in names and n not in (".", ".."):
+            names.append(n)
+    dirs = []
+    for get in (_models_dir, _models_store_dir, _place_chosen):
+        try:
+            d = get()
+        except Exception:
+            d = None
+        if d and str(d) not in dirs:
+            dirs.append(str(d))
+    for root in _app_roots():
+        d = os.path.join(root, "models")
+        if d not in dirs:
+            dirs.append(d)
+    for d in dirs:
+        for n in names:
+            f = os.path.join(d, n)
+            try:
+                if os.path.isfile(f) and os.path.getsize(f) > 0:
+                    return f
+            except Exception:
+                continue
+    return None
 
 
 def _put_model_part(mid, data_b64, first):
@@ -16145,7 +16200,7 @@ def _disk_stash_apply(rid, n, payload, drop=False):
 _self_758 = True
 # what this computer app is: its release, and the owner's public keys (release.py writes both in at each release, from version.json and
 # security/owner_keys.json, the halves Settings saves; only public halves, never a private part)
-_SELF_RELEASE = "7.96"  # ING-SELF-RELEASE
+_SELF_RELEASE = "7.97"  # ING-SELF-RELEASE
 _SELF_KEYS = [{"kid": "iej1hHjzk8YQm5BBv-52cR", "x": "jLimQPq8WiSfRge_iu7Qe7-fE-lBn7z6kfyHF7ehzco", "y": "fwgCio0OxurUKmdZPXbMT9Hp8wXzcz4p3G5GlS7AUUA"}, {"kid": "CdbXeLQDHJ63NSC4cT0xnK", "x": "p5utS3RZvzR8S_P4kuweAB7GMgpgtBWnI-8Eeb4YQBk", "y": "83hP2W7P9SnUssIEnIyJdUipkr_DHS6SE-dnKoEgVgo"}]  # ING-SELF-KEYS
 _SELF = {"lock": threading.RLock(), "read": {}, "last": None, "told": set()}
 _SELF_KIND = "ingenium-release-signature"
@@ -17411,6 +17466,73 @@ def _begin_session():
     return prior
 
 
+_QUIT_797 = {"closing": False}
+
+
+def _quit_stop_797(wait=4.0):
+    """7.97: the engine, the trainer and lending stopped, each in its own thread, all given at most `wait` seconds together."""
+    import threading as _t
+    jobs = []
+    for name in ("_engine_stop", "_train_stop_at_exit", "_share_stop", "_end_session"):
+        f = globals().get(name)
+        if callable(f):
+            th = _t.Thread(target=f, daemon=True, name="quit-" + name)
+            th.start()
+            jobs.append(th)
+    end = time.time() + wait
+    for th in jobs:
+        th.join(max(0.05, end - time.time()))
+
+
+def _quit_threads_797():
+    """7.97: which threads were still running, and where the main thread stood, for the crash log."""
+    try:
+        import threading as _t
+        import traceback
+        names = sorted("%s%s" % (th.name, "" if th.daemon else " (holds the app open)") for th in _t.enumerate())
+        main = _t.main_thread()
+        frame = sys._current_frames().get(main.ident)
+        where = "".join(traceback.format_stack(frame)[-6:]) if frame is not None else "(not found)"
+        return "threads: " + ", ".join(names) + "\nthe main thread stood at:\n" + where
+    except Exception:
+        return "threads: could not be read"
+
+
+def _quit_797(why):
+    """7.97: end Ingenium now: stop what it started, close its session, then end the process without waiting for anything left."""
+    _QUIT_797["closing"] = True
+    log_problem("quit: %s" % why)
+    try:
+        _quit_stop_797()
+    except Exception:
+        log_problem("quit: stopping failed", sys.exc_info())
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:
+        pass
+    os._exit(0)
+
+
+def _closed_797(*_a, **_k):
+    """7.97: the window closed. Stop the engine at once; should the app still be running 4 seconds after that (8 at most), end it."""
+    if _QUIT_797.get("watch"):
+        return
+    _QUIT_797["watch"] = True
+    _QUIT_797["closing"] = True
+    import threading as _t
+
+    def watch():
+        try:
+            _quit_stop_797(wait=4.0)
+        except Exception:
+            pass
+        time.sleep(4.0)
+        log_problem("quit: still running after the window closed; ending it now\n" + _quit_threads_797())
+        os._exit(0)
+    _t.Thread(target=watch, daemon=True, name="quit-watch").start()
+
+
 def _end_session():
     """A clean exit removes the breadcrumb, so only bad endings accumulate (6.7.1: and the start's own mark)."""
     _start_ok()
@@ -18201,6 +18323,7 @@ def main():
             _install_right_press_monitor(window)
             _care_attach(window)  # 6.7.1 (app_care_671.py)
         window.events.loaded += _on_loaded
+        window.events.closed += _closed_797  # 7.97 (app_quit_models_797.py)
     except Exception:
         log_problem("load: backend exposes no loaded event; watchdog still runs")
 
@@ -18354,9 +18477,7 @@ def main():
             _guard_bridge_frames()  # 6.7 (app_frames_67.py)
             webview.start(**kwargs)
             _started = True
-            _engine_stop()
-            _train_stop_at_exit()
-            _end_session()
+            _quit_797("the window's run ended")  # 7.97 (app_quit_models_797.py): stop what Ingenium started, then end at once
             if "private_mode" not in kwargs:
                 log_problem("webview.start accepted no persistence options; "
                             "this pywebview is old and work may not persist")

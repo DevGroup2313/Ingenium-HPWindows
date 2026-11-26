@@ -58,7 +58,7 @@ jobs:
           echo "APP_FILE=$(python tools/app_name.py file_name)" >> "$GITHUB_ENV"
           echo "APP_ID=$(python tools/app_name.py app_id)" >> "$GITHUB_ENV"
           # the build number: the version, the day and this repository's run number
-          echo "INGENIUM_VERSION=7.96.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
+          echo "INGENIUM_VERSION=7.97.$(date -u +%Y%m%d).${{ github.run_number }}" >> "$GITHUB_ENV"
           # Windows' own file version allows no part above 65535
           echo "INGENIUM_VERNUM=3.6.0.${{ github.run_number }}" >> "$GITHUB_ENV"
 
@@ -522,6 +522,18 @@ jobs:
             $o = Join-Path $env:RUNNER_TEMP "st-$($e.k).json"
             $p = Start-Process -FilePath (Join-Path $t "$($e.file).exe") -ArgumentList @('--selftest-model', 'none', '--selftest-out', $o) -WorkingDirectory $t -Wait -PassThru
             if ($p.ExitCode -ne 0) { if (Test-Path $o) { Get-Content $o }; Write-Output "::error::$($e.name) did not start its engine"; exit 1 }
+            # 7.97: and it loads a built-in model, from the models folder laid beside it as the copy for a PC without internet lays it. Her
+            # words (26 November 2026): "the models are no longer loading on the Windows Full edition app ... the built-in models do not
+            # work". Said in the summary and as a warning, never fatal, so Ingenium's own installers are still published.
+            $mf = Join-Path $env:RUNNER_TEMP "full\$env:APP_FILE\models"
+            if (Test-Path (Join-Path $mf 'builtin.json')) {
+              Copy-Item -Recurse $mf (Join-Path $t 'models')
+              $o2 = Join-Path $env:RUNNER_TEMP "st-$($e.k)-builtin.json"
+              $p2 = Start-Process -FilePath (Join-Path $t "$($e.file).exe") -ArgumentList @('--selftest-model', 'builtin', '--selftest-out', $o2) -WorkingDirectory $t -Wait -PassThru
+              $r2 = if (Test-Path $o2) { Get-Content $o2 -Raw | ConvertFrom-Json } else { $null }
+              if ($p2.ExitCode -eq 0 -and $r2 -and $r2.ok) { Note ("* {0}: loads its built-in model {1} in {2} s" -f $e.name, $r2.builtin.name, $r2.load_seconds) }
+              else { Write-Output "::warning::$($e.name) did not load a built-in model in its self-test"; Note ("* {0}: did NOT load a built-in model in its self-test: {1}" -f $e.name, $(if ($r2) { $r2.error } else { 'no report' })) }
+            } else { Note "* $($e.name): the built-in models were not at hand for its self-test" }
             Remove-Item -Recurse -Force $t -ErrorAction SilentlyContinue
             $out = Join-Path $env:RUNNER_TEMP "setup-$($e.k)"
             & $iscc /Qp "/DAppName=$($e.name)" "/DAppFile=$($e.file)" "/DAppIdent=$id" `
