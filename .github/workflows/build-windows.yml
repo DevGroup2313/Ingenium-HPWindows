@@ -467,12 +467,25 @@ jobs:
       #   replaces it in place, and the full edition asks once to bring in her work (modules/r332.js); nothing on the disk moves.
       #   Ingenium Gift keeps a data folder and an id of its own (IngeniumGift), so it never opens an owner's work, even on a computer
       #   that once held the master edition. Ingenium's own build only: an app Fabrica packages from this kit has its own app.json.
+      # 7.95: the editions no longer hold Ingenium's own installer back. From 7.87 to 7.94 the Mac mini repository had no editions of
+      # the same version, so this step failed and Ingenium for Windows was not published at all. Now a missing or unproven edition is
+      # said (a warning, and the summary), Ingenium's own installer is still built and published, and the Full and Gift installers
+      # already in the release stay as they were until editions of the same version come.
       - name: The Full and Gift editions' pages (from the Mac mini repository, checked)
+        id: editions
         if: env.APP_ID == 'com.yannieforest.ingenium'
+        continue-on-error: true
         run: python tools/get_editions.py "$RUNNER_TEMP/editions" "${{ github.ref_name }}"
 
+      - name: When the editions are not ready, say so
+        if: env.APP_ID == 'com.yannieforest.ingenium' && steps.editions.outcome != 'success'
+        run: |
+          echo "::warning::The Full and Gift editions of this version are not in the Mac mini repository yet: Ingenium's own installer is published, and the Full and Gift installers in the release stay as they were"
+          echo "### The Full and Gift editions were not built this time" >> "$GITHUB_STEP_SUMMARY"
+          echo "The Mac mini repository has no checked editions of this version yet, so only Ingenium's own installer is published. The Full and Gift installers already in the release are older until the next build." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build Ingenium Full and Ingenium Gift, each with its installer
-        if: env.APP_ID == 'com.yannieforest.ingenium'
+        if: env.APP_ID == 'com.yannieforest.ingenium' && steps.editions.outcome == 'success'
         shell: pwsh
         run: |
           function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
