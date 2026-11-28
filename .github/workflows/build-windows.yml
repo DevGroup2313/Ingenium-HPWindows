@@ -471,7 +471,7 @@ jobs:
       # the same version, so this step failed and Ingenium for Windows was not published at all. Now a missing or unproven edition is
       # said (a warning, and the summary), Ingenium's own installer is still built and published, and the Full and Gift installers
       # already in the release stay as they were until editions of the same version come.
-      - name: The Full and Gift editions' pages (from the Mac mini repository, checked)
+      - name: The Full, Gift and Demo editions' pages (from the Mac mini repository, checked)
         id: editions
         if: env.APP_ID == 'com.yannieforest.ingenium'
         continue-on-error: true
@@ -484,16 +484,19 @@ jobs:
           echo "### The Full and Gift editions were not built this time" >> "$GITHUB_STEP_SUMMARY"
           echo "The Mac mini repository has no checked editions of this version yet, so only Ingenium's own installer is published. The Full and Gift installers already in the release are older until the next build." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build Ingenium Full and Ingenium Gift, each with its installer
+      # 8.11: and the Demo edition, as an app of its own too (her words, 28 November 2026: "I want the Full, Gift and Demo editions"):
+      #   Ingenium Demo keeps a data folder and an id of its own (IngeniumDemo), as the Gift edition does.
+      - name: Build Ingenium Full, Ingenium Gift and Ingenium Demo, each with its installer
         if: env.APP_ID == 'com.yannieforest.ingenium' && steps.editions.outcome == 'success'
         shell: pwsh
         run: |
           function Note($t) { Add-Content $env:GITHUB_STEP_SUMMARY $t; Write-Output $t }
           $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $iscc) { Write-Output "::error::Inno Setup is missing"; exit 1 }
-          Note "### The Full and Gift editions, each an app of its own"
+          Note "### The Full, Gift and Demo editions, each an app of its own"
           foreach ($e in @(@{ k = 'full'; name = $env:APP_NAME; file = $env:APP_FILE; id = $env:APP_ID; pub = 'Ingenium-Full-Setup.exe' },
-                           @{ k = 'gift'; name = $env:APP_NAME; file = 'IngeniumGift'; id = "$env:APP_ID.gift"; pub = 'Ingenium-Gift-Setup.exe' })) {
+                           @{ k = 'gift'; name = $env:APP_NAME; file = 'IngeniumGift'; id = "$env:APP_ID.gift"; pub = 'Ingenium-Gift-Setup.exe' },
+                           @{ k = 'demo'; name = $env:APP_NAME; file = 'IngeniumDemo'; id = "$env:APP_ID.demo"; pub = 'Ingenium-Demo-Setup.exe' })) {
             $id = $e.id
             $w = Join-Path $env:RUNNER_TEMP "ed-$($e.k)"
             if (Test-Path $w) { Remove-Item -Recurse -Force $w }
@@ -559,6 +562,6 @@ jobs:
           if [ "$SZ" -le 2140000000 ]; then set -- "$@" "$RUNNER_TEMP/${APP_FILE}-Windows-with-models.zip" "${APP_FILE}-Windows-with-models.zip"
           else echo "::warning::The copy with the models is $SZ bytes, over GitHub's limit: it is not published this time"; fi
           # 7.45: the Full and Gift editions' installers, beside Ingenium's own (made above, in Ingenium's own build only)
-          for f in Ingenium-Full-Setup.exe Ingenium-Gift-Setup.exe; do if [ -f "$RUNNER_TEMP/$f" ]; then set -- "$@" "$RUNNER_TEMP/$f" "$f"; fi; done
+          for f in Ingenium-Full-Setup.exe Ingenium-Gift-Setup.exe Ingenium-Demo-Setup.exe; do if [ -f "$RUNNER_TEMP/$f" ]; then set -- "$@" "$RUNNER_TEMP/$f" "$f"; fi; done
           # R75: the Python-based package and the older name are retired
           OBSOLETE="${APP_FILE}-Windows.zip ${APP_FILE}-Windows-no-model.zip" bash tools/publish_release.sh Windows "$@"

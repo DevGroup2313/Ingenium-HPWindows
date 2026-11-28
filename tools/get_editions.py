@@ -24,7 +24,7 @@ import urllib.request
 out, branch = sys.argv[1], sys.argv[2]
 owner = sys.argv[3] if len(sys.argv) > 3 else os.environ.get("GITHUB_REPOSITORY_OWNER", "DevGroup2313")
 base = "https://raw.githubusercontent.com/%s/Ingenium-Mac-Mini/%s/editions/" % (owner, branch)
-EDITIONS = ("full", "gift")
+EDITIONS = ("full", "gift", "demo")  # 8.11: and the Demo edition
 
 page = open("ingenium.html", encoding="utf-8").read()
 m = re.search(r'var ING_VERSION="([0-9.]+)"', page)
